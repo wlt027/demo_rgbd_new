@@ -11,6 +11,7 @@
 #include <opencv2/opencv.hpp>
 // #include <opencv2/imgproc/imgproc.hpp>
 // #include <opencv2/highgui/highgui.hpp>
+#include "camodocal/camera_models/CameraFactory.h"
 #include "camodocal/camera_models/PinholeCamera.h"
 // #include "pointDefinition.h"
 #include <vector>
@@ -62,18 +63,28 @@ class CTrackerParam
 	double mp[2]; 
 	int mWidth; 
 	int mHeight; 
+
+	// harris corner threshold 
+	double mHarrisThreshold;
+
+	// dist between features 
+	double mMinDist; 
 };
 
 class CFeatureTracker
 {
     public:
-	CFeatureTracker(CTrackerParam);
+	CFeatureTracker(); 
+	CFeatureTracker(CTrackerParam& );
 	virtual ~CFeatureTracker(); 
 	
 	void init(); 
-	void handleImage(const cv::Mat &img, double img_time); 
+	void handleImage(const cv::Mat &img, double img_time=0.); 
 
 	bool inBoard(cv::Point2f& pt); 
+	void showPreFeatImg(); 
+
+	void setMask(); 
 
 	// whether initialized
 	bool mbInited; 
@@ -93,6 +104,8 @@ class CFeatureTracker
 
 	vector<ImagePoint> mvPreImagePts; 
 	vector<ImagePoint> mvCurImagePts; 
+
+	cv::Mat mMask; // mask to avoid duplicate features
 
 	vector<int> mvIds; 
 	int mFeatureIdFromStart; // unique feature id? 

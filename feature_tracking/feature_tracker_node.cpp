@@ -21,8 +21,9 @@ int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "featureTracking");
     ros::NodeHandle nh;
+    ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
 
-    ros::Subscriber imgDataSub = nh.subscribe<sensor_msgs::Image>("/camera/raw", 1, imgCallback); 
+    ros::Subscriber imgDataSub = nh.subscribe<sensor_msgs::Image>("/image/raw", 1, imgCallback); 
 
    
     ros::Publisher tracked_features_pub = nh.advertise<sensor_msgs::PointCloud2>("/image_points_last", 5); 
@@ -41,6 +42,5 @@ void imgCallback(const sensor_msgs::Image::ConstPtr& _img)
     cv::Mat img_mono = ptr->image; 
     double img_time = _img->header.stamp.toSec(); 
     feat_tracker.handleImage(img_mono, img_time); 
-    
 }
 
