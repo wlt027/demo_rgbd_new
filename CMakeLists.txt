@@ -58,8 +58,12 @@ include_directories(${catkin_INCLUDE_DIRS})
  link_libraries(${catkin_LIBRARIES})
  link_libraries(${OpenCV_LIBS})
 
+## feature tracking 
 add_executable(featureTracking_node feature_tracking/feature_tracker.cpp feature_tracking/feature_tracker_node.cpp)
 add_executable(test_feat_tracker feature_tracking/feature_tracker.cpp feature_tracking/test_feat_track.cpp)
+
+## vo 
+add_executable(test_vo vo/test_vo.cpp)
 # target_link_libraries(featureTracking ${catkin_LIBRARIES} ${OpenCV_LIBS})
 # add_executable(visualOdometry src/visualOdometry.cpp)
 # target_link_libraries(visualOdometry ${catkin_LIBRARIES} ${OpenCV_LIBS})
