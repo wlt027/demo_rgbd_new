@@ -2,7 +2,7 @@ project(demo_rgbd_new)
 
 cmake_minimum_required(VERSION 2.8.3)
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -w")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -w -g")
 SET(CMAKE_BUILD_TYPE "RelWithDebInfo")
 
 if(COMMAND cmake_policy)
@@ -53,8 +53,12 @@ include_directories(${EIGEN3_INCLUDE_DIR} "/usr/include/eigen3")
 include_directories("${PROJECT_SOURCE_DIR}/include")
 include_directories(${catkin_INCLUDE_DIRS})
 
+find_package(Ceres REQUIRED)
+include_directories(${CERES_INCLUDE_DIRS})
+
 # add_subdirectory(isamlib)
 # link_libraries(isamlib)
+ link_libraries(${CERES_LIBRARIES})
  link_libraries(${catkin_LIBRARIES})
  link_libraries(${OpenCV_LIBS})
 
@@ -63,7 +67,8 @@ add_executable(featureTracking_node feature_tracking/feature_tracker.cpp feature
 add_executable(test_feat_tracker feature_tracking/feature_tracker.cpp feature_tracking/test_feat_track.cpp)
 
 ## vo 
-add_executable(test_vo vo/test_vo.cpp)
+add_executable(test_vo vo/test_vo.cpp vo/projection_euler-ZXY.cpp)
+
 # target_link_libraries(featureTracking ${catkin_LIBRARIES} ${OpenCV_LIBS})
 # add_executable(visualOdometry src/visualOdometry.cpp)
 # target_link_libraries(visualOdometry ${catkin_LIBRARIES} ${OpenCV_LIBS})

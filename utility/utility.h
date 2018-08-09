@@ -162,7 +162,7 @@ class Utility
 	return Rx * Ry * Rz; 
     }
 
-    static Eigen::Matrix3d g2R(const Eigen::Vector3d &g);
+    // static Eigen::Matrix3d g2R(const Eigen::Vector3d &g);
 
     template <size_t N>
     struct uint_
