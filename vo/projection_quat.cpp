@@ -4,7 +4,7 @@
     A projection factor using quaternion in ceres 
 */
 
-#include "projection_euler-Quat.h"
+#include "projection_quat.h"
 
 namespace QUATERNION{
 
@@ -25,7 +25,7 @@ bool ProjectionFactor_Y2::Evaluate(double const *const *parameters, double *resi
     double qz = parameters[0][5];  // qz
     double qw = parameters[0][6];  // qw
     
-    Eigen::Quaterniond q(qx, qy, qz, qw); 
+    Eigen::Quaterniond q(qw, qx, qy, qz); 
     Eigen::Matrix<double, 3, 3> R = q.toRotationMatrix(); 
 
     double u0 = pts_i(0); double v0 = pts_i(1); 
@@ -60,6 +60,7 @@ bool ProjectionFactor_Y2::Evaluate(double const *const *parameters, double *resi
 	
 	for(int j=0; j<6; j++)
 	    jacobians[0][j] *= scale; 
+	jacobians[0][6] = 0; 
     }
     return true; 
 }
@@ -80,7 +81,7 @@ bool ProjectionFactor_Y3::Evaluate(double const *const *parameters, double *resi
     double qz = parameters[0][5];  // qz
     double qw = parameters[0][6];  // qw
     
-    Eigen::Quaterniond q(qx, qy, qz, qw); 
+    Eigen::Quaterniond q(qw, qx, qy, qz); 
     Eigen::Matrix<double, 3, 3> R = q.toRotationMatrix(); 
 
     double u0 = pts_i(0); double v0 = pts_i(1); double d0 = pts_i(2);
@@ -108,6 +109,7 @@ bool ProjectionFactor_Y3::Evaluate(double const *const *parameters, double *resi
 	jacobians[0][3] = dy_dq(0); 
 	jacobians[0][4] = dy_dq(1);
 	jacobians[0][5] = dy_dq(2); 
+	jacobians[0][6] = 0; 
     }
     return true; 
 }
@@ -128,7 +130,7 @@ bool ProjectionFactor_Y4::Evaluate(double const *const *parameters, double *resi
     double qz = parameters[0][5];  // qz
     double qw = parameters[0][6];  // qw
     
-    Eigen::Quaterniond q(qx, qy, qz, qw); 
+    Eigen::Quaterniond q(qw, qx, qy, qz); 
     Eigen::Matrix<double, 3, 3> R = q.toRotationMatrix(); 
 
     double u0 = pts_i(0); double v0 = pts_i(1); double d0 = pts_i(2);
@@ -137,6 +139,7 @@ bool ProjectionFactor_Y4::Evaluate(double const *const *parameters, double *resi
     Eigen::Vector3d X0(u0*d0, v0*d0, d0); 
     Eigen::Matrix<double, 1, 3> tmp = R.row(1) - v1*R.row(2); 
     double y4 = tmp * X0 + ty - v1*tz; 
+    *residuals = sqrt_info * y4;
 
     if(jacobians && jacobians[0])
     {
@@ -150,6 +153,8 @@ bool ProjectionFactor_Y4::Evaluate(double const *const *parameters, double *resi
 	jacobians[0][3] = dy_dq(0); 
 	jacobians[0][4] = dy_dq(1);
 	jacobians[0][5] = dy_dq(2); 
+	jacobians[0][6] = 0; 
+
     }
     return true; 
 }

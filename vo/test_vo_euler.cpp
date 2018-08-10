@@ -73,7 +73,7 @@ int main(int argc, char* argv[])
 
 void test_vo()
 {
-    int NUM = 50; 
+    int NUM = 100; 
     double err_pnp = 0; 
     double err_vo_demo = 0; 
     double err_vo_ceres = 0;
@@ -153,8 +153,8 @@ void test_vo()
     cout <<"mean err_pnp: "<<err_pnp/NUM<<endl; 
     cout <<"mean err_demo: "<<err_vo_demo/NUM<<endl; 
     cout <<"mean err_ceres: "<<err_vo_ceres/NUM<<endl;
-
-    return ;
+//
+   return ;
 }
 
 Eigen::Vector6d vo_ceres(std_3d& PT1, std_3d& PT2, Eigen::Vector6d& inipose)
@@ -333,7 +333,7 @@ void pnp(std_3d& pts1, std_3d& pts2, Eigen::Matrix<double, 6, 1>& pose)
     Eigen::Matrix<double, 3, 3> R = T.block(0, 0, 3, 3); 
     Eigen::Matrix<double, 3, 1> t = T.block(0, 3, 3, 1); 
     Eigen::Vector3d ypr = Utility::R2ypr(R);  // yrp
-    pose(0) = D2R(ypr(1)); pose(1) = D2R(ypr(2)); pose(2) = D2R(ypr(0)); 
+    pose(0) = D2R(ypr(2)); pose(1) = D2R(ypr(1)); pose(2) = D2R(ypr(0)); 
     pose(3) = t(0); pose(4) = t(1); pose(5) = t(2); 
     return ;
 }
