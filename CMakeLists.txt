@@ -67,7 +67,7 @@ add_executable(featureTracking_node feature_tracking/feature_tracker.cpp feature
 add_executable(test_feat_tracker feature_tracking/feature_tracker.cpp feature_tracking/test_feat_track.cpp)
 
 ## vo 
-add_executable(test_vo vo/test_vo.cpp vo/projection_euler-ZXY.cpp)
+add_executable(test_vo_euler vo/test_vo_euler.cpp vo/projection_euler-ZXY.cpp)
 
 # target_link_libraries(featureTracking ${catkin_LIBRARIES} ${OpenCV_LIBS})
 # add_executable(visualOdometry src/visualOdometry.cpp)
