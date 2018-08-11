@@ -61,6 +61,8 @@ void pnp(std_3d& pts1, std_3d& pts2, Eigen::Matrix<double, 6, 1>& );
 Eigen::Vector6d vo_demo_rgbd(std_3d& pts1, std_3d& pts2, Eigen::Vector6d& inipose);
 Eigen::Vector6d vo_ceres(std_3d& pts1, std_3d& pts2, Eigen::Vector6d& inipose);
 
+double depth_ratio = 0.2; 
+
 void testy2(); 
 void test_vo(); 
 
@@ -84,7 +86,8 @@ void test_vo()
 
     std::uniform_real_distribution<> uni_dis(-1.0, 1.0);
     std::uniform_real_distribution<> uni_z(1., 5.); 
-    std::normal_distribution<> noise{0,0.02};
+    std::normal_distribution<> noise{0,0.01};
+    std::normal_distribution<> noise_z{0, 0.04}; 
     std::uniform_real_distribution<> rangle(-5., 5.); 
     std::uniform_real_distribution<> rdis(-0.2, 0.2); 
 
@@ -116,7 +119,7 @@ void test_vo()
 	    Eigen::Vector3d p2 = R * p1 + t; 
 	    p2(0) += noise(gen); 
 	    p2(1) += noise(gen); 
-	    p2(2) += noise(gen); 
+	    p2(2) += noise_z(gen); // noise(gen); 
 	    if(p1(2) <= 0.3 || p2(2) <= 0.3)
 		continue; 
 	    PT1[i] = p1; 
@@ -124,9 +127,10 @@ void test_vo()
 	    i++;
 	}
 
+	int M = (int)(N*(1-depth_ratio)); 
 	// vo_pnp 
-	std_3d half_PT1(PT1.begin() + N/2, PT1.end()); 
-	std_3d half_PT2(PT2.begin() + N/2, PT2.end()); 
+	std_3d half_PT1(PT1.begin() + M, PT1.end()); 
+	std_3d half_PT2(PT2.begin() + M, PT2.end()); 
 	Eigen::Vector6d pnp_vo;
 	pnp(half_PT1, half_PT2, pnp_vo); 
 	// cout <<"pnp vo_p: "<<endl<<pnp_vo<<endl; 
@@ -167,7 +171,7 @@ Eigen::Vector6d vo_ceres(std_3d& PT1, std_3d& PT2, Eigen::Vector6d& inipose)
     static double para_pose[0][6]; 
 
     int N = PT1.size(); 
-    int M = N/2; 
+    int M = (int)(N *(1-depth_ratio)); 
     for(int i=0; i<6; i++)
 	para_pose[0][i] = inipose[i]; 
     
@@ -217,7 +221,7 @@ Eigen::Vector6d vo_ceres(std_3d& PT1, std_3d& PT2, Eigen::Vector6d& inipose)
 Eigen::Vector6d vo_demo_rgbd(std_3d& PT1, std_3d& PT2, Eigen::Vector6d& inipose)
 {
     int N = PT1.size(); 
-    int M = N/2; 
+    int M = (int)(N*(1-depth_ratio)); 
     int iterNum = 150;
     double scale = 10;
     

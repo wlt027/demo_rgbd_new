@@ -27,8 +27,31 @@ namespace Eigen{
     typedef Matrix<double, 7, 1> Vector7d; // x, y, z, qx, qy, qz, qw
 }
 
+struct Jacob_Q{
+    union 
+    {
+	struct
+	{
+	    float de_dx; // tx 
+	    float de_dy; // ty 
+	    float de_dz; // tz
+	    float de_dq1; // theta1  
+	    float de_dq2; // theta2
+	    float de_dq3; // theta3
+	    float de_dq4;
+	};
+	float de[7]; 
+    };
+    float err;
+};
+
+
+
+double depth_ratio = 0.7; 
+
 void vo_pnp(std_3d& pts1, std_3d& pts2, Eigen::Matrix<double, 7, 1>& );
 Eigen::Vector7d vo_ceres(std_3d& pts1, std_3d& pts2, Eigen::Vector7d& inipose);
+Eigen::Vector7d vo_demo(std_3d& pts1, std_3d& pts2, Eigen::Vector7d& inipose);
 
 double Fy2(Eigen::Matrix<double, 7, 1>& transform, Eigen::Vector3d& p1, Eigen::Vector3d& p2, Eigen::Matrix<double, 6, 1>* J = NULL);
 double Fy3(Eigen::Matrix<double, 7, 1>& transform, Eigen::Vector3d& p1, Eigen::Vector3d& p2, Eigen::Matrix<double, 6, 1>* J = NULL);
@@ -102,16 +125,18 @@ void test_vo()
 	    i++;
 	}
 
+	int M = (int)(N * (1.0 - depth_ratio));
+
 	// vo_pnp 
-	std_3d half_PT1(PT1.begin() + N/2, PT1.end()); 
-	std_3d half_PT2(PT2.begin() + N/2, PT2.end()); 
+	std_3d half_PT1(PT1.begin() + M, PT1.end()); 
+	std_3d half_PT2(PT2.begin() + M, PT2.end()); 
 	Eigen::Vector7d pnp_vo;
 	vo_pnp(half_PT1, half_PT2, pnp_vo); 
 	// cout <<"pnp vo_p: "<<endl<<pnp_vo<<endl;
-	Eigen::Vector6d pnp_vo_e = poseFromQuat2Euler(pnp_vo); 
+	// Eigen::Vector6d pnp_vo_e = poseFromQuat2Euler(pnp_vo); 
 
-	// Eigen::Vector7d delta_p = pnp_vo - pose; 
-	Eigen::Vector6d delta_p = pnp_vo_e - euler_pose; 
+	Eigen::Vector7d delta_p = pnp_vo - pose; 
+	// Eigen::Vector6d delta_p = pnp_vo_e - euler_pose; 
 
 	// cout <<"err_norm: "<<delta_p.norm()<<endl; 
 	err_pnp += delta_p.norm(); 
@@ -119,26 +144,131 @@ void test_vo()
 	// vo_demo_rgbd 
 	Eigen::Vector7d inipose; 
 	inipose << 0, 0, 0, 0, 0, 0, 1; 
-	// Eigen::Vector6d vo_p = vo_demo_rgbd(PT1, PT2, inipose); 
+	Eigen::Vector7d vo_p = vo_demo(PT1, PT2, inipose); 
+	
 	// cout <<"demo_rgbd vo_p: "<<endl<<vo_p<<endl; 
-	// delta_p = vo_p - pose; 
+	delta_p = vo_p - pose; 
 	// cout <<"err_norm: "<<delta_p.norm()<<endl;
-	// err_vo_demo += delta_p.norm(); 
+	err_vo_demo += delta_p.norm(); 
 
 	// vo_ceres 
-	Eigen::Vector7d vo_p = vo_ceres(PT1, PT2, inipose);
-	Eigen::Vector6d vo_p_e = poseFromQuat2Euler(vo_p); 
+	vo_p = vo_ceres(PT1, PT2, inipose);
+	// Eigen::Vector6d vo_p_e = poseFromQuat2Euler(vo_p); 
 	// cout <<"ceres vo_p: "<<endl<<vo_p<<endl; 
-	// delta_p = vo_p - pose; 
-	delta_p = vo_p_e - euler_pose; 
+	delta_p = vo_p - pose; 
+	// delta_p = vo_p_e - euler_pose; 
 	// cout <<"err_norm: "<<delta_p.norm()<<endl;
 	err_vo_ceres += delta_p.norm(); 
     }
     cout <<"mean err_pnp: "<<err_pnp/NUM<<endl; 
-   //  cout <<"mean err_demo: "<<err_vo_demo/NUM<<endl; 
+    cout <<"mean err_demo: "<<err_vo_demo/NUM<<endl; 
     cout <<"mean err_ceres: "<<err_vo_ceres/NUM<<endl;
 
     return ;
+}
+
+Eigen::Vector7d vo_demo(std_3d& PT1, std_3d& PT2, Eigen::Vector7d& inipose)
+{
+    int N = PT1.size(); 
+    int M = (int)(N*(1-depth_ratio)); 
+    int iterNum = 150;
+    double scale = 10;
+    
+    vector<Jacob_Q> vjq; 
+    double sum_e = 0; 
+    Eigen::Vector7d vo_p = inipose; 
+    for(int it=0; it<iterNum; it++)
+    {
+	vjq.clear(); 
+	sum_e = 0; 
+	for(int i=0; i<N; i++)
+	{
+	    Eigen::Vector3d p1 = PT1[i]; 
+	    Eigen::Vector3d p2 = PT2[i]; 
+	    Eigen::Vector6d J; 
+
+	    // first half for y2 
+	    if(i < M)
+	    {
+		Eigen::Vector3d np1 = p1/p1[2]; 
+		Eigen::Vector3d np2 = p2/p2[2];
+
+		double ey2 = Fy2(vo_p, np1, np2, &J); 
+		Jacob_Q je; 
+		for(int j=0; j<6; j++)
+		{
+		    je.de[j] = scale * J(j); 
+		}
+		je.de[6] = 0; 
+		je.err = scale * ey2; 
+		vjq.push_back(je); 
+		sum_e += SQ(je.err); 
+	    }else
+	    {
+		Eigen::Vector3d np1 = p1/p1[2]; 
+		Eigen::Vector3d np2 = p2/p2[2];
+		np1(2) = p1[2]; 
+
+		double ey3 = Fy3(vo_p, np1, np2, &J); 
+		Jacob_Q je; 
+		for(int j=0; j<6; j++)
+		{
+		    je.de[j] = J(j); 
+		}
+		je.de[6] = 0; 
+		je.err = ey3;
+		vjq.push_back(je);
+		sum_e += SQ(je.err); 
+		double ey4 = Fy4(vo_p, np1, np2, &J); 
+		for(int j=0; j<6; j++)
+		{
+		    je.de[j] = J(j); 
+		}
+		je.de[6] = 0;
+		je.err = ey4;
+		vjq.push_back(je);
+		sum_e += SQ(je.err); 
+	    }
+	}
+	// try vo to compute the transformation 
+	int N_JE = vjq.size(); 
+	cv::Mat matA(N_JE, 7, CV_32F, cv::Scalar::all(0));
+	cv::Mat matAt(7, N_JE, CV_32F, cv::Scalar::all(0));
+	cv::Mat matAtA(7, 7, CV_32F, cv::Scalar::all(0));
+	cv::Mat matB(N_JE, 1, CV_32F, cv::Scalar::all(0));
+	cv::Mat matAtB(7, 1, CV_32F, cv::Scalar::all(0));
+	cv::Mat matX(7, 1, CV_32F, cv::Scalar::all(0));
+
+	for(int i=0; i<N_JE; i++)
+	{
+	    Jacob_Q& jq = vjq[i]; 
+	    for(int j=0; j<7; j++)
+		matA.at<float>(i, j) = jq.de[j]; 
+	    matB.at<float>(i, 0) = -0.1*jq.err; 
+	}
+	cv::transpose(matA, matAt); 
+	matAtA = matAt*matA; 
+	matAtB = matAt * matB; 
+	cv::solve(matAtA, matAtB, matX, cv::DECOMP_QR); 
+	Eigen::Vector6d dmat; 
+	for(int j=0; j<3; j++)
+	{
+	    vo_p(j) += matX.at<float>(j, 0); 
+	    dmat(j) = matX.at<float>(j, 0); 
+	}
+	dmat(3) = matX.at<float>(3, 0); 
+	dmat(4) = matX.at<float>(4, 0); 
+	dmat(5) = matX.at<float>(5, 0); 
+	
+	Eigen::Vector3d theta(dmat(3), dmat(4), dmat(5)); 
+	Eigen::Quaterniond dq = Utility::deltaQ(theta);
+	Eigen::Quaterniond q = (q*dq).normalized(); 
+	vo_p(3) = q.x(); vo_p(4) = q.y(); vo_p(5) = q.z(); vo_p(6) = q.w(); 
+	    
+	if(dmat.norm() < 0.00001)
+	    break; 
+    }  
+    return vo_p; 
 }
 
 Eigen::Vector7d vo_ceres(std_3d& PT1, std_3d& PT2, Eigen::Vector7d& inipose)
@@ -152,7 +282,7 @@ Eigen::Vector7d vo_ceres(std_3d& PT1, std_3d& PT2, Eigen::Vector7d& inipose)
     static double para_pose[0][7]; 
 
     int N = PT1.size(); 
-    int M = N/2; 
+    int M = (int)(N*(1-depth_ratio)); 
     for(int i=0; i<7; i++)
 	para_pose[0][i] = inipose[i]; 
 
