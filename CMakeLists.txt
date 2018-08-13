@@ -37,6 +37,7 @@ find_package(catkin REQUIRED COMPONENTS
     pcl_conversions
     pcl_ros
     camera_model
+    tf
 )
 
 catkin_package(
@@ -69,6 +70,10 @@ add_executable(test_feat_tracker feature_tracking/feature_tracker.cpp feature_tr
 ## vo 
 add_executable(test_vo_euler vo/test_vo_euler.cpp vo/projection_euler-ZXY.cpp)
 add_executable(test_vo_quaternion vo/test_vo_quaternion.cpp vo/projection_quat.cpp)
+
+## depth handler
+add_executable(depth_handler vo/depth_handler_node.cpp vo/depth_handler.cpp )
+
 # target_link_libraries(featureTracking ${catkin_LIBRARIES} ${OpenCV_LIBS})
 # add_executable(visualOdometry src/visualOdometry.cpp)
 # target_link_libraries(visualOdometry ${catkin_LIBRARIES} ${OpenCV_LIBS})
