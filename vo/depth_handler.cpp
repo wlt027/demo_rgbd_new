@@ -29,12 +29,6 @@ namespace{
     void fromEigen2TF(tf::Transform & T, Eigen::Matrix<double, 3, 3>& R, Eigen::Matrix<double, 3, 1>& t)
     {
 	Eigen::Quaterniond q(R); 
-//	tf::Matrix3x3 tR; 
-//	for(int i=0; i<3; i++)
-//	for(int j=0; j<3; j++)
-//	{
-//	    tR[i][j] = R(i, j);
-//	}
 	tf::Quaternion tq(q.x(), q.y(), q.z(), q.w()); 
 	tf::Vector3 tt(t(0), t(1), t(2));
 	T = tf::Transform(tq, tt); 
