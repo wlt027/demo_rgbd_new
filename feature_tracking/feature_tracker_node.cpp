@@ -2,12 +2,12 @@
     Node interface 
 */
 
-
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <cv_bridge/cv_bridge.h>
 #include "feature_tracker.h"
+#include "../utility/pointDefinition.h"
 
 CTrackerParam track_param;
 CFeatureTracker feat_tracker(track_param); 
@@ -25,7 +25,6 @@ int main(int argc, char* argv[])
 
     ros::Subscriber imgDataSub = nh.subscribe<sensor_msgs::Image>("/image/raw", 1, imgCallback); 
 
-   
     ros::Publisher tracked_features_pub = nh.advertise<sensor_msgs::PointCloud2>("/image_points_last", 5); 
     imagePointsLastPubPointer = &tracked_features_pub;
 
@@ -41,6 +40,23 @@ void imgCallback(const sensor_msgs::Image::ConstPtr& _img)
 
     cv::Mat img_mono = ptr->image; 
     double img_time = _img->header.stamp.toSec(); 
-    feat_tracker.handleImage(img_mono, img_time); 
+    if(feat_tracker.handleImage(img_mono, img_time))
+    {
+	// publish msg 
+	pcl::PointCloud<ImagePoint>::Ptr imagePointsLast(new pcl::PointCloud<ImagePoint>());
+	imagePointsLast->points.resize(feat_tracker.mvPreImagePts.size()); 
+	for(int i=0; i<feat_tracker.mvPreImagePts.size(); i++)
+	{
+	    ImagePoint& pt = imagePointsLast->points[i]; 
+	    CFeatureTracker::ImagePoint& pt1 = feat_tracker.mvPreImagePts[i]; 
+	    pt.u = pt1.u;  pt.v = pt1.v; pt.ind = pt1.ind; 
+	}
+
+	sensor_msgs::PointCloud2 imagePointsLast2;
+	pcl::toROSMsg(*imagePointsLast,  imagePointsLast2); 
+	imagePointsLast2.header.stamp = ros::Time().fromSec(feat_tracker.mTimePre); 
+	
+	imagePointsLastPubPointer->publish(imagePointsLast2); 
+    }
 }
 

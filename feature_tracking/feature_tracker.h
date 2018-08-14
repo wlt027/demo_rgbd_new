@@ -18,11 +18,6 @@
 
 using namespace std; 
 
-struct ImagePoint {
-     float u, v;
-     int ind;
-};
-
 class CTrackerParam
 {
     public:
@@ -73,13 +68,20 @@ class CTrackerParam
 
 class CFeatureTracker
 {
+public:
+    struct ImagePoint 
+    {
+	float u, v;
+	int ind;
+    };
+
     public:
 	CFeatureTracker(); 
 	CFeatureTracker(CTrackerParam& );
 	virtual ~CFeatureTracker(); 
 	
 	void init(); 
-	void handleImage(const cv::Mat &img, double img_time=0.); 
+	bool handleImage(const cv::Mat &img, double img_time=0.); 
 
 	bool inBoard(cv::Point2f& pt); 
 	void showPreFeatImg(); 

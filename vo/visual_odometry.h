@@ -11,6 +11,9 @@
 #include <Eigen/Dense>
 #include <iostream>
 #include <vector>
+#include <sensor_msgs/PointCloud2.h>
+#include "../utility/pointDefinition.h"
+#include "tf/tf.h"
 
 using namespace std;
 
@@ -40,12 +43,17 @@ public:
     boost::shared_ptr<pcl::KdTreeFLANN<pcl::PointXYZI> > mKDTree; 
 
     double mZoomDis; // must equal to that in depth_handler 
-    vector<float> * mvDptCurr; 
-    vector<float> * mvDptLast; 
+    vector<float>  mvDptCurr; 
+    vector<float>  mvDptLast; 
     
-    vector<tf::Transform> mFtTrans; // record the pose when the features are first observed
-    boost::shared_ptr<pcl::PointCloud<ImagePoint> > mFtObs; // record the measurement 
-    tf::Transform mLastPose; // pose when mImgPTLast is observed 
+    vector<tf::Transform> mFtTransCurr; // record the pose when the features are first observed
+    vector<tf::Transform> mFtTransLast; // record the pose when the features are first observed
+
+    boost::shared_ptr<pcl::PointCloud<ImagePoint> > mFtObsCurr; // record the measurement 
+    boost::shared_ptr<pcl::PointCloud<ImagePoint> > mFtObsLast; // record the measurement 
+    
+    tf::Transform mLastPose; // pose for the mImgPTLast 
+    tf::Transform mCurrPose; // pose for the mImgPTCurr 
 
     double mdisThresholdForTriangulation; // 
 };	

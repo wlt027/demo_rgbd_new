@@ -32,7 +32,7 @@ void fromEigen2TF(tf::Transform & T, Eigen::Matrix<double, 3, 3>& R, Eigen::Matr
     return ; 
 }
 
-Eigen::Vecor3d stereo_triangulate(tf::Transform& T1 , tf::Transform& T2, 
+Eigen::Vector3d stereo_triangulate(tf::Transform& T1 , tf::Transform& T2, 
 					    Eigen::Vector2d& pt1, Eigen::Vector2d& pt2)
 {
     Eigen::Matrix<double, 3, 3> Ri, Rj; 

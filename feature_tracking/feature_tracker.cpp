@@ -93,7 +93,7 @@ void CFeatureTracker::init()
     camname, cv::Size(mParam.mWidth, mParam.mHeight));
 }
 
-void CFeatureTracker::handleImage(const cv::Mat& _img, double img_time)
+bool CFeatureTracker::handleImage(const cv::Mat& _img, double img_time)
 {	
     TicToc t_ft; 
 
@@ -122,7 +122,7 @@ void CFeatureTracker::handleImage(const cv::Mat& _img, double img_time)
     if(!mbInited) 
     {
 	mbInited = true; 
-	return ; 
+	return false; 
     }
 
     // 
@@ -266,6 +266,7 @@ void CFeatureTracker::handleImage(const cv::Mat& _img, double img_time)
 	// cv::waitKey(10); 
 	showPreFeatImg(); 
     }
+    return true;
 }
 
 void CFeatureTracker::showPreFeatImg()
