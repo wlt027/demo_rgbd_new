@@ -7,6 +7,7 @@
 
 #include "feature_tracker.h"
 #include "../utility/tic_toc.h"
+#include <Eigen/Core>
 #include <ros/ros.h>
 
 #define SQ(x) ((x)*(x))
@@ -16,17 +17,17 @@ CTrackerParam::~CTrackerParam(){}
 
 void CTrackerParam::defaultInit()
 {
-    mXSubregionNum = 6; // 12; 
-    mYSubregionNum = 5; // 8; 
+    mXSubregionNum = 12; // 6; // 12; 
+    mYSubregionNum = 8; // 5; // 8; 
     mTotalSubregionNum = mXSubregionNum * mYSubregionNum; 
     
-    mMaxFeatureNumInSubregion = 10; // 2; 
+    mMaxFeatureNumInSubregion = 2; // 10; // 2; 
     mMaxFeatureNum = mMaxFeatureNumInSubregion * mTotalSubregionNum; 
     
     mXBoundary = 20; 
     mYBoundary = 20;
     
-    mShowSkipNum = 0; // 2; 
+    mShowSkipNum = 2; // 2; 
     mShowDSRate = 2; 
     
     mMaxTrackDis = 100; 
@@ -34,8 +35,8 @@ void CTrackerParam::defaultInit()
     
     mbEqualized = true; //false; 
     
-    mfx = 525; // 617.306; // 525; 
-    mfy = 525; // 617.714; // 525;
+    mfx = 525.; // 617.306; // 525; 
+    mfy = 525.; // 617.714; // 525;
     mcx = 319.5; // 326.245; // 319.5; 
     mcy = 239.974; // 239.5; 
     mk[0] = 0; mk[1] = 0; 
@@ -47,7 +48,7 @@ void CTrackerParam::defaultInit()
     mSubregionHeight = (double) (mHeight - 2*mYBoundary) / (double)(mYSubregionNum); 
     
     mHarrisThreshold = 1e-6; // 1e-6;    
-    mMinDist = 20.0;
+    mMinDist = 10.0;
 }
 
 CFeatureTracker::CFeatureTracker()
@@ -82,15 +83,15 @@ void CFeatureTracker::init()
     mvIds.resize(mParam.mMaxFeatureNum, 0); 
 
     // camera parameters 
-    camodocal::PinholeCamera::Parameters camparam;
-    camparam.fx() = mParam.mfx; camparam.fy() = mParam.mfy; 
-    camparam.cx() = mParam.mcx; camparam.cy() = mParam.mcy; 
-    camparam.k1() = mParam.mk[0]; camparam.k2() = mParam.mk[1]; 
-    camparam.p1() = mParam.mp[0]; camparam.p2() = mParam.mp[1];
-
-    string camname("rs435");
-    mpCam = camodocal::CameraFactory::instance()->generateCamera(camodocal::Camera::PINHOLE, 
-    camname, cv::Size(mParam.mWidth, mParam.mHeight));
+//    camodocal::PinholeCamera::Parameters camparam;
+//    camparam.fx() = mParam.mfx; camparam.fy() = mParam.mfy; 
+//    camparam.cx() = mParam.mcx; camparam.cy() = mParam.mcy; 
+//    camparam.k1() = mParam.mk[0]; camparam.k2() = mParam.mk[1]; 
+//    camparam.p1() = mParam.mp[0]; camparam.p2() = mParam.mp[1];
+//
+    // string camname("rs435");
+    // mpCam = new camodocal::PinholeCamera; // camodocal::CameraFactory::instance()->generateCamera(camodocal::Camera::PINHOLE, camname, cv::Size(mParam.mWidth, mParam.mHeight));
+    // mpCam->setParameters(camparam); 
 }
 
 bool CFeatureTracker::handleImage(const cv::Mat& _img, double img_time)
@@ -142,7 +143,7 @@ bool CFeatureTracker::handleImage(const cv::Mat& _img, double img_time)
     setMask(); 
 
     int recordFeatureNum = mPreTotalFeatureNum;  
-    assert(mPreTotalFeatureNum == mvPrePts.size()); 
+    // assert(mPreTotalFeatureNum == mvPrePts.size()); 
     for(int i=0; i<mParam.mYSubregionNum; i++)
     {
 	for(int j=0; j<mParam.mXSubregionNum; j++)
@@ -227,7 +228,9 @@ bool CFeatureTracker::handleImage(const cv::Mat& _img, double img_time)
 		mvIds[featureCount] = mvIds[i]; 
 		
 		Eigen::Vector3d tmp; 
-		mpCam->liftProjective(Eigen::Vector2d(mvCurPts[i].x, mvCurPts[i].y), tmp); 
+		// mpCam->liftProjective(Eigen::Vector2d(mvCurPts[i].x, mvCurPts[i].y), tmp); 
+		tmp(0) = (mvCurPts[i].x - mParam.mcx)/mParam.mfx; 
+		tmp(1) = (mvCurPts[i].y - mParam.mcy)/mParam.mfy; 
 		point.u = tmp(0); 
 		point.v = tmp(1); 
 		point.ind = mvIds[i]; 
@@ -237,7 +240,11 @@ bool CFeatureTracker::handleImage(const cv::Mat& _img, double img_time)
 		
 		if(i >= recordFeatureNum) // new detected feature in preImg
 		{
-		    mpCam->liftProjective(Eigen::Vector2d(mvPrePts[i].x, mvPrePts[i].y), tmp);
+		    // mpCam->liftProjective(Eigen::Vector2d(mvPrePts[i].x, mvPrePts[i].y), tmp);
+		    // cout <<"mvPrePts: "<<mvPrePts[i].x<<" "<< mvPrePts[i].y<<" output: "<<tmp(0)<<" "<<tmp(1)<<endl;
+		    tmp(0) = (mvPrePts[i].x - mParam.mcx)/mParam.mfx; 
+		    tmp(1) = (mvPrePts[i].y - mParam.mcy)/mParam.mfy; 
+
 		    point.u = tmp(0); 
 		    point.v = tmp(1); 
 		    mvPreImagePts.push_back(point); 

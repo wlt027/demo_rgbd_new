@@ -11,8 +11,8 @@
 #include <opencv2/opencv.hpp>
 // #include <opencv2/imgproc/imgproc.hpp>
 // #include <opencv2/highgui/highgui.hpp>
-#include "camodocal/camera_models/CameraFactory.h"
-#include "camodocal/camera_models/PinholeCamera.h"
+// #include "camodocal/camera_models/CameraFactory.h"
+// #include "camodocal/camera_models/PinholeCamera.h"
 // #include "pointDefinition.h"
 #include <vector>
 
@@ -117,7 +117,7 @@ public:
 	double mTimeCur; 
 	
 	// camera model 
-	camodocal::CameraPtr mpCam; 
+	// camodocal::PinholeCamera* mpCam; 
 	
 	// parameters
 	CTrackerParam mParam; 

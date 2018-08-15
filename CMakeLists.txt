@@ -36,7 +36,7 @@ find_package(catkin REQUIRED COMPONENTS
     std_msgs
     pcl_conversions
     pcl_ros
-    camera_model
+    # camera_model
     tf
 )
 

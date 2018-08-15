@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
     ros::NodeHandle nh; 
 
     ros::Subscriber syncCloudSub = nh.subscribe<sensor_msgs::Image>
- 	("/camera/depth_registered/image", 10, syncCloudHandler);
+ 	("/camera/depth_registered/image", 1, syncCloudHandler);
  
     // ros::Subscriber syncCloudSub = nh.subscribe<sensor_msgs::Image>
 //	 ("/camera/depth_registered/image", 10, receiver);

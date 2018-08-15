@@ -19,11 +19,12 @@ void imgCallback(const sensor_msgs::Image::ConstPtr& imageData);
 
 int main(int argc, char* argv[]) 
 {
-    ros::init(argc, argv, "featureTracking");
+    ros::init(argc, argv, "feature_tracking");
     ros::NodeHandle nh;
-    ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
+    ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
 
-    ros::Subscriber imgDataSub = nh.subscribe<sensor_msgs::Image>("/image/raw", 1, imgCallback); 
+    // ros::Subscriber imgDataSub = nh.subscribe<sensor_msgs::Image>("/image/raw", 1, imgCallback); 
+    ros::Subscriber imgDataSub = nh.subscribe<sensor_msgs::Image>("/camera/rgb/image_rect", 1, imgCallback); 
 
     ros::Publisher tracked_features_pub = nh.advertise<sensor_msgs::PointCloud2>("/image_points_last", 5); 
     imagePointsLastPubPointer = &tracked_features_pub;
@@ -51,12 +52,15 @@ void imgCallback(const sensor_msgs::Image::ConstPtr& _img)
 	    CFeatureTracker::ImagePoint& pt1 = feat_tracker.mvPreImagePts[i]; 
 	    pt.u = pt1.u;  pt.v = pt1.v; pt.ind = pt1.ind; 
 	}
-
+	
 	sensor_msgs::PointCloud2 imagePointsLast2;
 	pcl::toROSMsg(*imagePointsLast,  imagePointsLast2); 
 	imagePointsLast2.header.stamp = ros::Time().fromSec(feat_tracker.mTimePre); 
 	
 	imagePointsLastPubPointer->publish(imagePointsLast2); 
+	// cout <<"feature_track_node: msg at" <<std::fixed<<imagePointsLast2.header.stamp.toSec()<<" first and last pt: "<<imagePointsLast->points[0].u<<" "<<imagePointsLast->points[imagePointsLast->points.size()-1].u<<" "<<imagePointsLast->points[imagePointsLast->points.size()-1].v<<endl;
+
+
     }
 }
 

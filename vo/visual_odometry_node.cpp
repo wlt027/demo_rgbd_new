@@ -55,6 +55,8 @@ void imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& imagePoints2)
     voData.pose.pose.position.z = t.getZ(); 
     voDataPubPointer->publish(voData);
     
+    cout<<std::fixed<<voData.header.stamp.toSec()<<" vo result: "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl;
+
     // broadcast voTrans 
     tf::StampedTransform voTrans;
     voTrans.frame_id_ = "/camera_init";
@@ -71,7 +73,7 @@ void imageDataHandler(const sensor_msgs::Image::ConstPtr& imageData);
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "visualOdometry");
+  ros::init(argc, argv, "visual_odometry");
   ros::NodeHandle nh;
 
   ros::Subscriber imagePointsSub = nh.subscribe<sensor_msgs::PointCloud2>

@@ -1,7 +1,7 @@
 <launch>
 
   <!--node pkg="demo_rgbd_slimmed" type="processDepthmap" name="processDepthmap" output="screen"/-->
-  <node pkg="demo_rgbd_slimmed" type="test_voxel" name="test_depth" output="screen"/>
+  <node pkg="demo_rgbd_new" type="test_depth_process" name="test_depth" output="screen"/>
  
 
 </launch>

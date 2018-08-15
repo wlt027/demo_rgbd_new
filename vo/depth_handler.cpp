@@ -9,7 +9,10 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include <cv_bridge/cv_bridge.h>
+#include <iostream>
 #include "opencv/cv.h"
+
+using namespace std;
 
 namespace{
 
@@ -54,10 +57,10 @@ mCloudPub(new pcl::PointCloud<pcl::PointXYZI>())
 	mCloudStamp[i] = 0; 
 	mCloudArray[i].reset(new pcl::PointCloud<pcl::PointXYZI>()); 
     }
-    mk[0] = 617.31; // fx
-    mk[1] = 617.71; // fy
-    mk[2] = 326.24; // cx
-    mk[3] = 239.97; // cy
+    mk[0] = 525.; // 617.31; // fx
+    mk[1] = 525.; // 617.71; // fy
+    mk[2] = 319.5; // 326.24; // cx
+    mk[3] = 239.5; // 239.97; // cy
 }
 
 // template<int CLOUD_NUM>
@@ -82,9 +85,10 @@ void DepthHandler::cloudHandler(const sensor_msgs::Image::ConstPtr& dpt_img_msg)
     cv::Mat dpt_img = cv_bridge::toCvCopy(dpt_img_msg)->image;
     
     // 
+    const float* syncCloud2Pointer = reinterpret_cast<const float*>(&dpt_img_msg->data[0]);
     float scale = 0.001; 
     float min_dis = 0.3; 
-    float max_dis = 1.7;  // keep depth range 
+    float max_dis = 17;  // keep depth range 
     for(double i = halfDS; i < dpt_img.rows; i += mCloudDSRate)
 	for(double j = halfDS; j < dpt_img.cols; j += mCloudDSRate)
 	{
@@ -95,8 +99,9 @@ void DepthHandler::cloudHandler(const sensor_msgs::Image::ConstPtr& dpt_img_msg)
 	    for(int ii = is; ii<= ie; ii++)
 		for(int jj = js; jj<= je; jj++)
 		{
-		    unsigned short _dpt = dpt_img.at<unsigned short>(ii, jj); 
-		    vd = _dpt * scale; 
+		    // unsigned short _dpt = dpt_img.at<unsigned short>(ii, jj); 
+		    // vd = _dpt * scale; 
+		    vd = syncCloud2Pointer[ii * dpt_img.cols + jj]; 
 		    if(vd > min_dis && vd < max_dis)
 		    {
 			pixelCnt++; 
@@ -119,11 +124,16 @@ void DepthHandler::cloudHandler(const sensor_msgs::Image::ConstPtr& dpt_img_msg)
     
     pcl::PointCloud<pcl::PointXYZI>::Ptr cloudPointer = mCloudArray[mSyncCloudId]; 
     cloudPointer->clear();
+    
+    cout <<std::fixed<<"depth_handler.cpp: receive "<<time<<" input "<<tmpPC->points.size()<<" points!"<<endl; 
 
     pcl::VoxelGrid<pcl::PointXYZI> downSizeFilter;
     downSizeFilter.setInputCloud(tmpPC);
     downSizeFilter.setLeafSize(0.1, 0.1, 0.1);
     downSizeFilter.filter(*cloudPointer);
+    
+    cout <<"depth_handler.cpp: after downsampling cloudPointer has "<<cloudPointer->points.size()<<" points!"<<endl;
+
     return ; 
 }
 
