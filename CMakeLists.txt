@@ -2,7 +2,7 @@ project(demo_rgbd_new)
 
 cmake_minimum_required(VERSION 2.8.3)
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -w -g")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -w -g -O3")
 SET(CMAKE_BUILD_TYPE "RelWithDebInfo")
 
 if(COMMAND cmake_policy)
@@ -74,6 +74,7 @@ add_executable(visual_odometry vo/visual_odometry.cpp vo/visual_odometry_node.cp
 
 ## depth handler
 add_executable(depth_handler vo/depth_handler_node.cpp vo/depth_handler.cpp )
+add_executable(test_depth_process vo/test_depth_process.cpp)
 
 # target_link_libraries(featureTracking ${catkin_LIBRARIES} ${OpenCV_LIBS})
 # add_executable(visualOdometry src/visualOdometry.cpp)
