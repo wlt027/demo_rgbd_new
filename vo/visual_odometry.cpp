@@ -375,7 +375,9 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 	    dmat(5) = matX.at<float>(5, 0); 
 	    Eigen::Vector3d theta(dmat(3), dmat(4), dmat(5)); 
 	    Eigen::Quaterniond dq = Utility::deltaQ(theta);
-	    Eigen::Quaterniond q = (q*dq).normalized(); 
+
+	    Eigen::Quaterniond q(vo_p(6), vo_p(3), vo_p(4), vo_p(5));  
+	    q = (q*dq).normalized(); 
 	    vo_p(3) = q.x(); vo_p(4) = q.y(); vo_p(5) = q.z(); vo_p(6) = q.w(); 
 
 	    if(dmat.norm() < 0.000001)

@@ -69,7 +69,9 @@ add_executable(test_feat_tracker feature_tracking/feature_tracker.cpp feature_tr
 
 ## vo 
 add_executable(test_vo_euler vo/test_vo_euler.cpp vo/projection_euler-ZXY.cpp)
+add_executable(test_vo_euler_ip vo/test_vo_euler_ip.cpp vo/projection_euler-ZXY.cpp)
 add_executable(test_vo_quaternion vo/test_vo_quaternion.cpp vo/projection_quat.cpp)
+add_executable(test_vo_quaternion_ip vo/test_vo_quaternion_ip.cpp vo/projection_quat.cpp)
 add_executable(visual_odometry vo/visual_odometry.cpp vo/visual_odometry_node.cpp vo/stereo_triangulate.cpp)
 
 ## depth handler
