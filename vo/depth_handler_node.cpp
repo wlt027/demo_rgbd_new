@@ -49,7 +49,7 @@ void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData)
     // publish the result 
     sensor_msgs::PointCloud2 depthCloud2;
     pcl::toROSMsg(*(pDptHandler->mCloudPub), depthCloud2);
-    depthCloud2.header.frame_id = "camera2";
+    depthCloud2.header.frame_id = "camera";
     depthCloud2.header.stamp = voData->header.stamp;
     depthCloudPubPointer->publish(depthCloud2);
 }

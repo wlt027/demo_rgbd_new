@@ -158,18 +158,19 @@ Eigen::Vector7d vo_demo(vector<ip_M>& vip, Eigen::Vector7d& inipose)
 	    }
 	}
 	// try vo to compute the transformation 
+	int const DIM = 6; 
 	int N_JE = vjq.size(); 
-	cv::Mat matA(N_JE, 7, CV_32F, cv::Scalar::all(0));
-	cv::Mat matAt(7, N_JE, CV_32F, cv::Scalar::all(0));
-	cv::Mat matAtA(7, 7, CV_32F, cv::Scalar::all(0));
+	cv::Mat matA(N_JE, DIM, CV_32F, cv::Scalar::all(0));
+	cv::Mat matAt(DIM, N_JE, CV_32F, cv::Scalar::all(0));
+	cv::Mat matAtA(DIM, DIM, CV_32F, cv::Scalar::all(0));
 	cv::Mat matB(N_JE, 1, CV_32F, cv::Scalar::all(0));
-	cv::Mat matAtB(7, 1, CV_32F, cv::Scalar::all(0));
-	cv::Mat matX(7, 1, CV_32F, cv::Scalar::all(0));
+	cv::Mat matAtB(DIM, 1, CV_32F, cv::Scalar::all(0));
+	cv::Mat matX(DIM, 1, CV_32F, cv::Scalar::all(0));
 
 	for(int i=0; i<N_JE; i++)
 	{
 	    Jacob_Q& jq = vjq[i]; 
-	    for(int j=0; j<7; j++)
+	    for(int j=0; j<DIM; j++)
 		matA.at<float>(i, j) = jq.de[j]; 
 	    matB.at<float>(i, 0) = -0.1*jq.err; 
 	}
@@ -182,6 +183,12 @@ Eigen::Vector7d vo_demo(vector<ip_M>& vip, Eigen::Vector7d& inipose)
 	cv::solve(matAtA, matAtB, matX, cv::DECOMP_QR); 
 	cout <<"matX: "<<endl<<matX<<endl;
 	Eigen::Vector6d dmat; 
+	if(matX.at<float>(0,0) != matX.at<float>(0, 0))
+	{
+	    cout<<"nan break!"<<endl;
+	    break; 
+	}
+
 	for(int j=0; j<3; j++)
 	{
 	    vo_p(j) += matX.at<float>(j, 0); 

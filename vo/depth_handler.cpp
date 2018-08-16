@@ -42,7 +42,7 @@ namespace{
 // template<int CLOUD_NUM>
 DepthHandler::DepthHandler(): 
 mCloudCnt(-1),
-mCloudSkip(1), 
+mCloudSkip(5), 
 mInitTime(-1),
 mCloudDSRate(5),
 mSyncCloudId(-1),
@@ -125,14 +125,14 @@ void DepthHandler::cloudHandler(const sensor_msgs::Image::ConstPtr& dpt_img_msg)
     pcl::PointCloud<pcl::PointXYZI>::Ptr cloudPointer = mCloudArray[mSyncCloudId]; 
     cloudPointer->clear();
     
-    cout <<std::fixed<<"depth_handler.cpp: receive "<<time<<" input "<<tmpPC->points.size()<<" points!"<<endl; 
+    // cout <<std::fixed<<"depth_handler.cpp: receive "<<time<<" input "<<tmpPC->points.size()<<" points!"<<endl; 
 
     pcl::VoxelGrid<pcl::PointXYZI> downSizeFilter;
     downSizeFilter.setInputCloud(tmpPC);
     downSizeFilter.setLeafSize(0.1, 0.1, 0.1);
     downSizeFilter.filter(*cloudPointer);
     
-    cout <<"depth_handler.cpp: after downsampling cloudPointer has "<<cloudPointer->points.size()<<" points!"<<endl;
+    // cout <<"depth_handler.cpp: after downsampling cloudPointer has "<<cloudPointer->points.size()<<" points!"<<endl;
 
     return ; 
 }
@@ -148,6 +148,7 @@ void DepthHandler::voDataHandler(const nav_msgs::Odometry::ConstPtr& vo_trans)
     tf::Transform currPose(qj, tj); 
     tf::Quaternion qi = mLastPose.getRotation(); 
     tf::Vector3 ti = mLastPose.getOrigin(); 
+    cout <<"DP: receive vo at "<<std::fixed<<time<<" location: "<<vo_t.x<<" "<< vo_t.y<<" "<<vo_t.z<<endl;
 
     tf::Transform Tj = currPose; 
     tf::Transform Tij = mLastPose.inverse() * currPose; 
@@ -160,6 +161,7 @@ void DepthHandler::voDataHandler(const nav_msgs::Odometry::ConstPtr& vo_trans)
     {
 	pcl::PointXYZI pj; 
 	int recPtNum = mCloudRec->points.size(); 
+        // cout <<std::fixed<<"DP: handle vo at "<<time<<" lastPC has "<<recPtNum<<" points!"<<endl;
 	for(int i=0; i<recPtNum; i++)
 	{
 	    pcl::PointXYZI pi = mCloudRec->points[i]; 
@@ -168,11 +170,12 @@ void DepthHandler::voDataHandler(const nav_msgs::Odometry::ConstPtr& vo_trans)
 	    tf::Vector3 tf_pj = Tji * tf_pi; 
 	    pj.x = tf_pj.x(); pj.y = tf_pj.y(); pj.z = tf_pj.z(); 
 	    double elasp_time = time - mInitTime - pj.intensity;
-	    if(fabs(pj.z) >0.3 && fabs(pj.x/pj.z) < 2 && fabs(pj.y/pj.z) < 1 && tf_pj.length() < 10 && elasp_time <= 5.)
+	    if(fabs(pj.z) >0.3 && fabs(pj.x/pj.z) < 2 && fabs(pj.y/pj.z) < 1 && tf_pj.length() < 15 && elasp_time <= 5.)
 		tmp->points.push_back(pj); 
 	}
     }
-    
+    // cout <<"DP: after transform lastPC now tempCloud has "<<tmp->points.size()<<" points!"<<endl;
+
     while(mCloudStamp[mRegCloudId] <= time && mRegCloudId != (mSyncCloudId + 1)%CLOUD_NUM)
     {
 	double ratio = (time - mCloudStamp[mRegCloudId])/(time - mTimeRec); 
@@ -191,13 +194,15 @@ void DepthHandler::voDataHandler(const nav_msgs::Odometry::ConstPtr& vo_trans)
 	    tf::Vector3 tf_ptt(ptt.x, ptt.y, ptt.z); 
 	    tf::Vector3 tf_pj = Tjt * tf_ptt; 
 	    pj.x = tf_pj.x(); pj.y = tf_pj.y(); pj.z = tf_pj.z(); 
-	    if(fabs(pj.z) >0.3 && fabs(pj.x/pj.z) < 2 && fabs(pj.y/pj.z) < 1 && tf_pj.length() < 10)
+	    if(fabs(pj.z) >0.3 && fabs(pj.x/pj.z) < 2 && fabs(pj.y/pj.z) < 1.5 && tf_pj.length() < 15)
 		tmp->points.push_back(pj); 
 	}
 
 	mRegCloudId = (mRegCloudId + 1) % CLOUD_NUM;    
     }
-    
+
+    // cout<<"DP: after register tempCloud has "<<tmp->points.size() <<" points"<<endl;
+
     mCloudRec->clear(); 
     pcl::VoxelGrid<pcl::PointXYZI> downSizeFilter;
     downSizeFilter.setInputCloud(tmp);
@@ -219,6 +224,7 @@ void DepthHandler::voDataHandler(const nav_msgs::Odometry::ConstPtr& vo_trans)
 	    tmp->points.push_back(pp); 
 	}
     }
+    // cout <<"DP: after downsample depth cloud has "<<depthCloudNum<<" points"<<endl;
 
     // pcl::PointCloud<pcl::PointXYZI>::Ptr tmp2(new pcl::PointCloud<pcl::PointXYZI>); 
     mCloudPub->clear();
@@ -235,6 +241,7 @@ void DepthHandler::voDataHandler(const nav_msgs::Odometry::ConstPtr& vo_trans)
 	mCloudPub->points[i].intensity = mZoomDis;
     }
     mTimeRec = time; 
+    // cout <<"DP: after downsample again depth cloud has "<<tempCloud2Num<<" points to publish "<<endl;
 }
 
 

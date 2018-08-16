@@ -228,7 +228,7 @@ Eigen::Vector6d vo_demo_rgbd(vector<ip_M>& vip, Eigen::Vector6d& inipose)
 	    }
 	}
 
-	cout <<"iterator i: "<<it<<" sum_err: "<<sum_e<<endl; 
+	// cout <<"iterator i: "<<it<<" sum_err: "<<sum_e<<endl; 
 	
 	// try vo to compute the transformation 
 	int N_JE = vje.size(); 
@@ -249,11 +249,14 @@ Eigen::Vector6d vo_demo_rgbd(vector<ip_M>& vip, Eigen::Vector6d& inipose)
 	cv::transpose(matA, matAt); 
 	matAtA = matAt*matA; 
 	matAtB = matAt * matB; 
-	cout<<"iter = "<<it<<endl;
-	cout<<"matAtA: "<<endl<<matAtA<<endl;
-	cout<<"matAtB: "<<endl<<matAtB<<endl;
 	cv::solve(matAtA, matAtB, matX, cv::DECOMP_QR); 
-	cout<<"matX: "<<endl<<matX<<endl; 
+	if(it <= 1)
+	{
+	    cout<<"iter = "<<it<<endl;
+	    cout<<"matAtA: "<<endl<<matAtA<<endl;
+	    cout<<"matAtB: "<<endl<<matAtB<<endl;
+	    cout<<"matX: "<<endl<<matX<<endl; 
+	}
 	Eigen::Vector6d dmat; 
 
 	for(int j=0; j<6; j++)

@@ -17,6 +17,14 @@
 
 using namespace std;
 
+struct ip_M
+{
+    typedef enum{NO_DEPTH =0, DEPTH_MES, DEPTH_TRI, INVALID} DPT_TYPE;
+    float ui, vi, uj, vj, s; // s responds to Xi = [ui,vi,1] * si
+    int ind;
+    DPT_TYPE v; 
+};
+
 
 class VisualOdometry 
 {
@@ -56,6 +64,10 @@ public:
     tf::Transform mCurrPose; // pose for the mImgPTCurr 
 
     double mdisThresholdForTriangulation; // 
+
+    // to display the 3d point cloud of the features 
+    boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> > mImagePointsProj;
+    vector<ip_M> mPtRelations;    
 };	
 
 

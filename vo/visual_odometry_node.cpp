@@ -7,8 +7,10 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <opencv/cv.h>
 #include <ros/ros.h>
 
+#include <cv_bridge/cv_bridge.h>
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/Imu.h>
 
@@ -55,7 +57,7 @@ void imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& imagePoints2)
     voData.pose.pose.position.z = t.getZ(); 
     voDataPubPointer->publish(voData);
     
-    cout<<std::fixed<<voData.header.stamp.toSec()<<" vo result: "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl;
+    cout<<"vo node at "<<std::fixed<<voData.header.stamp.toSec()<<" vo result: "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl;
 
     // broadcast voTrans 
     tf::StampedTransform voTrans;
@@ -68,6 +70,12 @@ void imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& imagePoints2)
     
     // TODO: handle msg depth point
 
+    // deal with image
+    sensor_msgs::PointCloud2 imagePointsProj2;
+    pcl::toROSMsg(*(vo.mImagePointsProj), imagePointsProj2);
+    imagePointsProj2.header.frame_id = "camera";
+    imagePointsProj2.header.stamp = ros::Time().fromSec(vo.mTimeLast);
+    imagePointsProjPubPointer->publish(imagePointsProj2);    
 }
 void imageDataHandler(const sensor_msgs::Image::ConstPtr& imageData);
 
@@ -93,44 +101,47 @@ int main(int argc, char** argv)
   // ros::Publisher depthPointsPub = nh.advertise<sensor_msgs::PointCloud2> ("/depth_points_last", 5);
   // depthPointsPubPointer = &depthPointsPub;
 
-  // ros::Publisher imagePointsProjPub = nh.advertise<sensor_msgs::PointCloud2> ("/image_points_proj", 1);
-  // imagePointsProjPubPointer = &imagePointsProjPub;
+  ros::Publisher imagePointsProjPub = nh.advertise<sensor_msgs::PointCloud2> ("/image_points_proj", 1);
+  imagePointsProjPubPointer = &imagePointsProjPub;
 
-  // ros::Subscriber imageDataSub = nh.subscribe<sensor_msgs::Image>("/image/show", 1, imageDataHandler);
+  ros::Subscriber imageDataSub = nh.subscribe<sensor_msgs::Image>("/image/show", 1, imageDataHandler);
 
-  // ros::Publisher imageShowPub = nh.advertise<sensor_msgs::Image>("/image/show_2", 1);
-  // imageShowPubPointer = &imageShowPub;
+  ros::Publisher imageShowPub = nh.advertise<sensor_msgs::Image>("/image/show_2", 1);
+  imageShowPubPointer = &imageShowPub;
 
   ros::spin();
 
   return 0;
 }
 
-
 void imageDataHandler(const sensor_msgs::Image::ConstPtr& imageData) 
 {
-//
-//  cv_bridge::CvImagePtr bridge = cv_bridge::toCvCopy(imageData, "bgr8");
-//
-//  int ipRelationsNum = ipRelations->points.size();
-//  for (int i = 0; i < ipRelationsNum; i++) {
-//    if (fabs(ipRelations->points[i].v) < 0.5) {
-//      cv::circle(bridge->image, cv::Point((kImage[2] - ipRelations->points[i].z * kImage[0]) / showDSRate,
-//                (kImage[5] - ipRelations->points[i].h * kImage[4]) / showDSRate), 1, CV_RGB(255, 0, 0), 2);
-//    } else if (fabs(ipRelations->points[i].v - 1) < 0.5) {
-//      cv::circle(bridge->image, cv::Point((kImage[2] - ipRelations->points[i].z * kImage[0]) / showDSRate,
-//                (kImage[5] - ipRelations->points[i].h * kImage[4]) / showDSRate), 1, CV_RGB(0, 255, 0), 2);
-//    } else if (fabs(ipRelations->points[i].v - 2) < 0.5) {
-//      cv::circle(bridge->image, cv::Point((kImage[2] - ipRelations->points[i].z * kImage[0]) / showDSRate,
-//                (kImage[5] - ipRelations->points[i].h * kImage[4]) / showDSRate), 1, CV_RGB(0, 0, 255), 2);
-//    } /*else {
-//      cv::circle(bridge->image, cv::Point((kImage[2] - ipRelations->points[i].z * kImage[0]) / showDSRate,
-//                (kImage[5] - ipRelations->points[i].h * kImage[4]) / showDSRate), 1, CV_RGB(0, 0, 0), 2);
-//    }*/
-//  }
-//
-//  sensor_msgs::Image::Ptr imagePointer = bridge->toImageMsg();
-//  imageShowPubPointer->publish(imagePointer);
+    // cv_bridge::CvImagePtr bridge = cv_bridge::toCvCopy(imageData, "bgr8");
+    cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(imageData, sensor_msgs::image_encodings::MONO8);
+    ptr = cv_bridge::cvtColor(ptr, sensor_msgs::image_encodings::BGR8);
+    cv::Mat show_img = ptr->image; 
+    double kImage[9] = {525.0, 0.0, 319.5, 0.0, 525.0, 239.5, 0.0, 0.0, 1.0};
+    double showDSRate = 2.;
+    vector<ip_M> ipRelations = vo.mPtRelations; 
+    int ipRelationsNum = ipRelations.size();
+    for (int i = 0; i < ipRelationsNum; i++) 
+    {
+	ip_M pt = ipRelations[i];
+	if ( pt.v == ip_M::NO_DEPTH) 
+	{
+	    cv::circle(show_img, cv::Point((kImage[2] - pt.uj * kImage[0]) / showDSRate, (kImage[5] - pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(255, 0, 0), 2);
+	} else if (pt.v == ip_M::DEPTH_MES) {
+	    cv::circle(show_img, cv::Point((kImage[2] - pt.uj * kImage[0]) / showDSRate,(kImage[5] - pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(0, 255, 0), 2);
+	} else if (pt.v == ip_M::DEPTH_TRI) {
+	    cv::circle(show_img, cv::Point((kImage[2] - pt.uj * kImage[0]) / showDSRate,(kImage[5] - pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(0, 0, 255), 2);
+	} /*else {
+	    cv::circle(bridge->image, cv::Point((kImage[2] - ipRelations->points[i].z * kImage[0]) / showDSRate,
+	    (kImage[5] - ipRelations->points[i].h * kImage[4]) / showDSRate), 1, CV_RGB(0, 0, 0), 2);
+	    }*/
+    }
+    ptr->image = show_img; 
+    sensor_msgs::Image::Ptr imagePointer = ptr->toImageMsg();
+    imageShowPubPointer->publish(imagePointer);
 }
 
 

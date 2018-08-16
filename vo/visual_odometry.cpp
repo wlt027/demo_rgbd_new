@@ -15,13 +15,6 @@
 using namespace std; 
 
 namespace{
-struct ip_M
-{
-    typedef enum{NO_DEPTH =0, DEPTH_MES, DEPTH_TRI, INVALID} DPT_TYPE;
-    float ui, vi, uj, vj, s; // s responds to Xi = [ui,vi,1] * si
-    int ind;
-    DPT_TYPE v; 
-};
 
 struct Jacob_Q{
     union 
@@ -40,9 +33,12 @@ struct Jacob_Q{
     };
     float err;
 };
-    void saveipRelations(vector<ip_M>& ip)
+    void saveipRelations(vector<ip_M>& ip, double time)
     {
-	ofstream ouf("ipRelations2.log"); 
+	stringstream ss; 
+	ss <<"./log/"<<std::fixed<<time<<"_new.log"; 
+	// ofstream ouf("ipRelations2.log"); 
+	ofstream ouf(ss.str().c_str()); 
 	for(int i=0; i<ip.size(); i++)
 	{
 	    ip_M& pt = ip[i]; 
@@ -64,8 +60,13 @@ mKDTree(new pcl::KdTreeFLANN<pcl::PointXYZI>),
 mZoomDis(10.),
 mdisThresholdForTriangulation(1.), //
 mFtObsCurr(new pcl::PointCloud<ImagePoint>),
-mFtObsLast(new pcl::PointCloud<ImagePoint>)
-{}
+mFtObsLast(new pcl::PointCloud<ImagePoint>),
+mImagePointsProj(new pcl::PointCloud<pcl::PointXYZ>)
+{
+    tf::Vector3 it(0 ,0 ,0);
+    tf::Quaternion iq(0,0,0,1); 
+    mCurrPose = mLastPose = tf::Transform(iq, it);
+}
 VisualOdometry::~VisualOdometry()
 {
 }
@@ -105,22 +106,27 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
     // std::vector<int> ipInd;
     
     int j = 0;
+    int cnt_matched = 0; 
+    int cnt_no_depth = 0; 
+    int cnt_with_depth = 0; 
     for(int i=0; i<imgPTLastNum; i++)
     {
 	bool ipFound = false; 
 	for(; j<imgPTCurrNum; j++)
 	{
-	    if(mImgPTLast->points[i].ind == mImgPTCurr->points[j].ind) 
+	    if(mImgPTCurr->points[j].ind == mImgPTLast->points[i].ind) 
 	    {
+		// cout <<"i = "<<i<<" j = "<<j<<" ind = "<< mImgPTCurr->points[j].ind <<endl;
 		ipFound = true; 
 		break; 
 	    }
-	    if(mImgPTLast->points[j].ind > mImgPTLast->points[i].ind)
+	    if(mImgPTCurr->points[j].ind > mImgPTLast->points[i].ind)
 		break; 
 	}
 	
 	if(ipFound)
 	{
+	    ++cnt_matched; 
 	    // normalized point 
 	    ipr.ui = mImgPTLast->points[i].u; 
 	    ipr.vi = mImgPTLast->points[i].v; 
@@ -142,7 +148,7 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 		// cout <<"ips: "<<ips.x<<" "<<ips.y<<" "<<ips.z<<endl; 
 		mKDTree->nearestKSearch(ips, 3, pointSearchInd, pointSearchSqrDis); 
 		double minDepth, maxDepth; 
-		if(pointSearchInd[0] < 0.5 && pointSearchInd.size() == 3)
+		if(pointSearchSqrDis[0] < 0.5 && pointSearchInd.size() == 3)
 		{
 		    pcl::PointXYZI depthPoint = mPC->points[pointSearchInd[0]];
 		    double x1 = depthPoint.x * depthPoint.intensity / mZoomDis;
@@ -174,12 +180,14 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 			- v*x1*z2 + v*x2*z1 - u*y1*z3 + u*y3*z1 + v*x1*z3 - v*x3*z1 + u*y2*z3 
 			- u*y3*z2 - v*x2*z3 + v*x3*z2);
 		    ipr.v = ip_M::DEPTH_MES; // meaning this point has a depth measurement 
-		    
+		 
+		    ++cnt_with_depth; 
 		    // check the validity of the depth measurement 
 		    if(maxDepth - minDepth > 2) // lie on an edge or noisy point? 
 		    {	
 			ipr.s = 0; 
 			ipr.v = ip_M::NO_DEPTH; 
+			--cnt_with_depth; 
 		    }else if(ipr.s - maxDepth > 0.2)
 		    {
 			ipr.s = maxDepth; 
@@ -190,10 +198,12 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 		}else{
 		    ipr.s = 0; 
 		    ipr.v = ip_M::NO_DEPTH; 
+		    ++cnt_no_depth; 
 		}
 	    }else{
 		ipr.s = 0; 
 		ipr.v = ip_M::NO_DEPTH;
+		++cnt_no_depth; 
 	    }
 		
 	    // if no depth 
@@ -216,6 +226,8 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 		    {
 			ipr.s = depth; 
 			ipr.v = ip_M::DEPTH_TRI; 
+			--cnt_no_depth; 
+			++cnt_with_depth;
 		    }
 		}
 
@@ -242,6 +254,8 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 	}
     }
     
+    // cout <<"vo at "<<std::fixed<<mTimeCurr<<" has found "<<cnt_matched<<" matches, with depth: "<<cnt_with_depth<<" no depth: "<<cnt_no_depth<<endl;
+
     // solve VO 
     Eigen::Matrix<double, 7, 1> vo_p; 
     vo_p << 0, 0, 0, 0, 0, 0, 1;
@@ -254,8 +268,8 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
     // std::vector<float> ipy2;
     vector<Jacob_Q> vjq; 
     vjq.reserve(ipRelations.size()); 
-    double scale_y2 = 10; 
-    saveipRelations(ipRelations);
+    double scale_y2 = 100; 
+    // saveipRelations(ipRelations, mTimeCurr);
 
     int ptNumNoDepthRec = 0;
     int ptNumWithDepthRec = 0;
@@ -335,29 +349,30 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 
 	// solve the problem 
 	int N_JE = vjq.size(); 
+	int const DIM = 6; 
 	if(N_JE > 10)
 	{
-	    cv::Mat matA(N_JE, 7, CV_32F, cv::Scalar::all(0));
-	    cv::Mat matAt(7, N_JE, CV_32F, cv::Scalar::all(0));
-	    cv::Mat matAtA(7, 7, CV_32F, cv::Scalar::all(0));
+	    cv::Mat matA(N_JE, DIM, CV_32F, cv::Scalar::all(0));
+	    cv::Mat matAt(DIM, N_JE, CV_32F, cv::Scalar::all(0));
+	    cv::Mat matAtA(DIM, DIM, CV_32F, cv::Scalar::all(0));
 	    cv::Mat matB(N_JE, 1, CV_32F, cv::Scalar::all(0));
-	    cv::Mat matAtB(7, 1, CV_32F, cv::Scalar::all(0));
-	    cv::Mat matX(7, 1, CV_32F, cv::Scalar::all(0));
+	    cv::Mat matAtB(DIM, 1, CV_32F, cv::Scalar::all(0));
+	    cv::Mat matX(DIM, 1, CV_32F, cv::Scalar::all(0));
 	    for(int i=0; i<N_JE; i++)
 	    {
 		Jacob_Q& jq = vjq[i]; 
-		for(int j=0; j<7; j++)
+		for(int j=0; j<DIM; j++)
 		    matA.at<float>(i, j) = jq.de[j]; 
 		matB.at<float>(i, 0) = -0.1*jq.err; 
 	    }
 	    cv::transpose(matA, matAt); 
 	    matAtA = matAt * matA; 
 	    matAtB = matAt * matB; 
-	    cout<<"matAtA: "<<endl<<matAtA<<endl; 
-	    cout<<"matAtB: "<<endl<<matAtB<<endl; 
+	    // cout<<"matAtA: "<<endl<<matAtA<<endl; 
+	    // cout<<"matAtB: "<<endl<<matAtB<<endl; 
 	    cv::solve(matAtA, matAtB, matX, cv::DECOMP_QR); 
 	    Eigen::Matrix<double, 6, 1> dmat; 
-	    cout<<"matX: "<<endl<<matX<<endl;
+	    // cout<<"matX: "<<endl<<matX<<endl;
 
 	    if(matX.at<float>(0,0) != matX.at<float>())// nan
 	    {
@@ -380,20 +395,31 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 	    q = (q*dq).normalized(); 
 	    vo_p(3) = q.x(); vo_p(4) = q.y(); vo_p(5) = q.z(); vo_p(6) = q.w(); 
 
-	    if(dmat.norm() < 0.000001)
+	    if(dmat.norm() < 0.00001)
 		break;
 	}
     }   
 
     {
 	// prepare for the next loop
-
+	cout <<"vo at " <<std::fixed<<mTimeCurr<<" result: "<<endl<<vo_p<<endl;
 	// add vo to currentpose
 	tf::Vector3 t(vo_p(0), vo_p(1), vo_p(2));
 	tf::Quaternion q(vo_p(3), vo_p(4), vo_p(5), vo_p(6)); 
 	tf::Transform T_ji(q, t);
 	tf::Transform T_ij = T_ji.inverse(); 
+	{
+	   tf::Vector3 t = T_ij.getOrigin(); 
+	   cout <<"Tij.t "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl; 
+	}
 	mCurrPose = mLastPose*T_ij; 
+
+	{
+	    tf::Vector3 t = mLastPose.getOrigin(); 
+	    cout <<"mLastPose "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl; 
+	    t = mCurrPose.getOrigin(); 
+	    cout <<"mCurrPose "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl; 
+	}
 	mLastPose = mCurrPose; 
 	
 	// set up feature points 
@@ -436,6 +462,23 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
     }  
 
     // publish msg done by the node 
+    mImagePointsProj->points.clear(); 
+    for(int i=0; i<ipRelations.size(); i++)
+    {
+	ip_M ipr = ipRelations[i]; 
+	if(ipr.v == ip_M::DEPTH_MES || ipr.v == ip_M::DEPTH_TRI)
+	{
+	    pcl::PointXYZ pt; 
+	    pt.x = ipr.ui * ipr.s; 
+	    pt.y = ipr.vi * ipr.s; 
+	    pt.z = ipr.s; 
+	    mImagePointsProj->points.push_back(pt); 
+	}
+    }
+
+    // save this for displaying 
+    mPtRelations.swap(ipRelations); 
+    
     return ; 
 }
 
@@ -446,6 +489,7 @@ void VisualOdometry::depthCloudHandler(const sensor_msgs::PointCloud2ConstPtr& d
     mPC->clear(); 
     pcl::fromROSMsg(*depthCloud2, *mPC); 
     int depthCloudNum = mPC->points.size(); 
+    // cout <<"vo receive dpt has: "<<depthCloudNum<<" points!"<<endl;
     if(depthCloudNum > 20)
     {
 	for(int i=0; i<depthCloudNum; i++)
