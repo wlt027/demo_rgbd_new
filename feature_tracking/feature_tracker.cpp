@@ -29,11 +29,12 @@ void CTrackerParam::defaultInit()
     
     mShowSkipNum = 2; // 2; 
     mShowDSRate = 2; 
-    
+    mbShowTrackedResult = false; // whether to show feature track result 
+
     mMaxTrackDis = 100; 
     mTrackWinSize = 15; 
     
-    mbEqualized = true; //false; 
+    mbEqualized = false; // true; //false; 
     
     mfx = 525.; // 617.306; // 525; 
     mfy = 525.; // 617.714; // 525;
@@ -143,7 +144,7 @@ bool CFeatureTracker::handleImage(const cv::Mat& _img, double img_time)
     setMask(); 
 
     int recordFeatureNum = mPreTotalFeatureNum;  
-    // assert(mPreTotalFeatureNum == mvPrePts.size()); 
+    assert(mPreTotalFeatureNum == mvPrePts.size()); 
     for(int i=0; i<mParam.mYSubregionNum; i++)
     {
 	for(int j=0; j<mParam.mXSubregionNum; j++)
@@ -179,7 +180,8 @@ bool CFeatureTracker::handleImage(const cv::Mat& _img, double img_time)
 		    if(((float*)(mHarrisPre.data + mHarrisPre.step1() * yInd))[xInd] > mParam.mHarrisThreshold)
 		    {
 			mvPrePts.push_back(pt);  
-			mvIds.push_back(mFeatureIdFromStart);  
+			// mvIds.push_back(mFeatureIdFromStart);  
+			mvIds[mPreTotalFeatureNum + numFound] = mFeatureIdFromStart;
 			numFound++; 
 			mFeatureIdFromStart++; 
 		    }
@@ -264,14 +266,17 @@ bool CFeatureTracker::handleImage(const cv::Mat& _img, double img_time)
 
     // publish for showing 
     mShowCnt = (mShowCnt + 1) % (mParam.mShowSkipNum + 1);     
-    if(mShowCnt == mParam.mShowSkipNum)
+    mbSendImgForShow = (mShowCnt == mParam.mShowSkipNum);
+    if(mbSendImgForShow)
     {
 	// cv_bridge::CvImage bridge;
 	// bridge.image = mImgShow; 
 	// bridge.encoding = "mono8"; 
 	// cv::imshow("show_img", mImgShow); 
 	// cv::waitKey(10); 
-	showPreFeatImg(); 
+	
+	if(mParam.mbShowTrackedResult)
+	    showPreFeatImg(); 
     }
     return true;
 }

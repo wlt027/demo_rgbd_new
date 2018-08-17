@@ -13,7 +13,7 @@ CTrackerParam track_param;
 CFeatureTracker feat_tracker(track_param); 
 
 ros::Publisher *imagePointsLastPubPointer;
-// ros::Publisher *imageShowPubPointer;
+ros::Publisher *imageShowPubPointer;
 
 void imgCallback(const sensor_msgs::Image::ConstPtr& imageData);
 
@@ -28,6 +28,9 @@ int main(int argc, char* argv[])
 
     ros::Publisher tracked_features_pub = nh.advertise<sensor_msgs::PointCloud2>("/image_points_last", 5); 
     imagePointsLastPubPointer = &tracked_features_pub;
+    
+    ros::Publisher imageShowPub = nh.advertise<sensor_msgs::Image>("/image/show", 1);
+    imageShowPubPointer = &imageShowPub;
 
     ros::spin();
 
@@ -59,8 +62,15 @@ void imgCallback(const sensor_msgs::Image::ConstPtr& _img)
 	
 	imagePointsLastPubPointer->publish(imagePointsLast2); 
 	// cout <<"feature_track_node: msg at" <<std::fixed<<imagePointsLast2.header.stamp.toSec()<<" first and last pt: "<<imagePointsLast->points[0].u<<" "<<imagePointsLast->points[imagePointsLast->points.size()-1].u<<" "<<imagePointsLast->points[imagePointsLast->points.size()-1].v<<endl;
-
-
+    
+	// show img 
+	if(feat_tracker.mbSendImgForShow)
+	{
+	    cv_bridge::CvImage bridge; 
+	    bridge.image = feat_tracker.mImgShow; 
+	    bridge.encoding = "mono8"; 
+	    imageShowPubPointer->publish(bridge.toImageMsg()); 
+	}
     }
 }
 

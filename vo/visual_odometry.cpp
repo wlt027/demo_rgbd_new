@@ -408,18 +408,8 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 	tf::Quaternion q(vo_p(3), vo_p(4), vo_p(5), vo_p(6)); 
 	tf::Transform T_ji(q, t);
 	tf::Transform T_ij = T_ji.inverse(); 
-	{
-	   tf::Vector3 t = T_ij.getOrigin(); 
-	   cout <<"Tij.t "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl; 
-	}
-	mCurrPose = mLastPose*T_ij; 
 
-	{
-	    tf::Vector3 t = mLastPose.getOrigin(); 
-	    cout <<"mLastPose "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl; 
-	    t = mCurrPose.getOrigin(); 
-	    cout <<"mCurrPose "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl; 
-	}
+	mCurrPose = mLastPose*T_ij; 
 	mLastPose = mCurrPose; 
 	
 	// set up feature points 

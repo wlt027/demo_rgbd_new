@@ -44,6 +44,7 @@ class CTrackerParam
 	// showing 
 	int mShowSkipNum; 
 	int mShowDSRate; 
+	bool mbShowTrackedResult; 
 
 	// track condition
 	double mMaxTrackDis; 
@@ -97,6 +98,7 @@ public:
 	
 	// show
 	int mShowCnt; 
+	int mbSendImgForShow; 
 	cv::Mat mImgShow; 
 	cv::Mat mHarrisPre; // extract harris for previous image  
 
