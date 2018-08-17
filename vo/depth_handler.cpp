@@ -88,7 +88,7 @@ void DepthHandler::cloudHandler(const sensor_msgs::Image::ConstPtr& dpt_img_msg)
     const float* syncCloud2Pointer = reinterpret_cast<const float*>(&dpt_img_msg->data[0]);
     float scale = 0.001; 
     float min_dis = 0.3; 
-    float max_dis = 17;  // keep depth range 
+    float max_dis = 7;  // keep depth range 
     for(double i = halfDS; i < dpt_img.rows; i += mCloudDSRate)
 	for(double j = halfDS; j < dpt_img.cols; j += mCloudDSRate)
 	{

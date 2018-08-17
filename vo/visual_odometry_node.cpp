@@ -117,23 +117,31 @@ int main(int argc, char** argv)
 void imageDataHandler(const sensor_msgs::Image::ConstPtr& imageData) 
 {
     // cv_bridge::CvImagePtr bridge = cv_bridge::toCvCopy(imageData, "bgr8");
-    cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(imageData, sensor_msgs::image_encodings::MONO8);
-    ptr = cv_bridge::cvtColor(ptr, sensor_msgs::image_encodings::BGR8);
+//    cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(imageData, sensor_msgs::image_encodings::MONO8);
+//    ptr = cv_bridge::cvtColor(ptr, sensor_msgs::image_encodings::BGR8);
+    // cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(imageData, sensor_msgs::image_encodings::BGR8);
+    cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(imageData, "bgr8");
+
     cv::Mat show_img = ptr->image; 
+
     double kImage[9] = {525.0, 0.0, 319.5, 0.0, 525.0, 239.5, 0.0, 0.0, 1.0};
     double showDSRate = 2.;
     vector<ip_M> ipRelations = vo.mPtRelations; 
     int ipRelationsNum = ipRelations.size();
+    // cout<<"vo_node display image at "<<std::fixed<<imageData->header.stamp.toSec()<<endl;
     for (int i = 0; i < ipRelationsNum; i++) 
     {
 	ip_M pt = ipRelations[i];
 	if ( pt.v == ip_M::NO_DEPTH) 
-	{
-	    cv::circle(show_img, cv::Point((kImage[2] - pt.uj * kImage[0]) / showDSRate, (kImage[5] - pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(255, 0, 0), 2);
+	{	
+	    // cout<<"No depth: pt.uj = "<<(kImage[2] - pt.uj * kImage[0])<<" pt.vj: "<<(kImage[5] - pt.vj * kImage[4]) <<" pt.s = "<<pt.s<<endl;
+	    cv::circle(show_img, cv::Point((kImage[2] + pt.uj * kImage[0]) / showDSRate, (kImage[5] + pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(255, 0, 0), 2);
 	} else if (pt.v == ip_M::DEPTH_MES) {
-	    cv::circle(show_img, cv::Point((kImage[2] - pt.uj * kImage[0]) / showDSRate,(kImage[5] - pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(0, 255, 0), 2);
+	    // cout<<"Depth MES: pt.uj = "<<(kImage[2] - pt.uj * kImage[0])<<" pt.vj: "<<(kImage[5] - pt.vj * kImage[4]) <<" pt.s = "<<pt.s<<endl;
+	    cv::circle(show_img, cv::Point((kImage[2] + pt.uj * kImage[0]) / showDSRate,(kImage[5] + pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(0, 255, 0), 2);
 	} else if (pt.v == ip_M::DEPTH_TRI) {
-	    cv::circle(show_img, cv::Point((kImage[2] - pt.uj * kImage[0]) / showDSRate,(kImage[5] - pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(0, 0, 255), 2);
+	    // cout<<"Depth TRI: pt.uj = "<<(kImage[2] - pt.uj * kImage[0])<<" pt.vj: "<<(kImage[5] - pt.vj * kImage[4]) <<" pt.s = "<<pt.s<<endl;
+	    cv::circle(show_img, cv::Point((kImage[2] + pt.uj * kImage[0]) / showDSRate,(kImage[5] + pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(0, 0, 255), 2);
 	} /*else {
 	    cv::circle(bridge->image, cv::Point((kImage[2] - ipRelations->points[i].z * kImage[0]) / showDSRate,
 	    (kImage[5] - ipRelations->points[i].h * kImage[4]) / showDSRate), 1, CV_RGB(0, 0, 0), 2);

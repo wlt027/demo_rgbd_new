@@ -66,6 +66,7 @@ include_directories(${CERES_INCLUDE_DIRS})
 ## feature tracking 
 add_executable(featureTracking_node feature_tracking/feature_tracker.cpp feature_tracking/feature_tracker_node.cpp)
 add_executable(test_feat_tracker feature_tracking/feature_tracker.cpp feature_tracking/test_feat_track.cpp)
+add_executable(featureTracking_ori feature_tracking/featureTracking.cpp)
 
 ## vo 
 add_executable(test_vo_euler vo/test_vo_euler.cpp vo/projection_euler-ZXY.cpp)
