@@ -63,7 +63,7 @@ Eigen::Vector3d stereo_triangulate(Eigen::Matrix<double, 3, 4>& proj_m1, Eigen::
 	A(1,k) = y1 * proj_m1(2, k) - proj_m1(1, k);
 	A(2,k) = x1 * proj_m1(1, k) - y1 * proj_m1(0, k); 
 	A(3,k) = x2 * proj_m2(2, k) - proj_m2(0, k); 
-	A(4,k) = x2 * proj_m2(2, k) - proj_m2(1, k); 
+	A(4,k) = y2 * proj_m2(2, k) - proj_m2(1, k); 
 	A(5,k) = x2 * proj_m2(1, k) - y2 * proj_m2(0, k);
     }
 

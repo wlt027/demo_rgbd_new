@@ -222,15 +222,17 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 		// verify enough distance 
 		tf::Transform first_pose = mFtTransLast[i]; // i corresponds to feature i in ImgPTLast 
 		tf::Vector3 dis_ = mLastPose.getOrigin() - first_pose.getOrigin(); 
-		tf::Transform T21 = mLastPose.inverse()*first_pose; 
+		// tf::Transform T21 = mLastPose.inverse()*first_pose; 
+		tf::Transform T12 = first_pose.inverse()*mLastPose; 
 		tf::Transform I; 
 		// cout<<"dis_: "<<dis_.getX()<<" "<<dis_.getY()<<" "<<dis_.getZ()<<" len: "<<dis_.length()<<endl;
 		if(dis_.length() >= mdisThresholdForTriangulation) 
 		{
 		    Eigen::Vector2d p1(mFtObsLast->points[i].u, mFtObsLast->points[i].v); 
 		    Eigen::Vector2d p2(ipr.ui, ipr.vi); 
-		    Eigen::Vector3d pt_2 = stereo_triangulate(T21, I, p1, p2); 
-
+		    // this is a bug not T21, but T12
+		    // Eigen::Vector3d pt_2 = stereo_triangulate(T21, I, p1, p2); 
+		    Eigen::Vector3d pt_2 = stereo_triangulate(T12, I, p1, p2); 
 		    // cout<<" vo tri: at "<<std::fixed<<mTimeLast<<" u0 = "<<p1(0)<<" v0 "<<p1(1)<<" u1 "<<p2(0)<<" v1 "<<p2(1)<<endl;
 		    tf::Vector3 loc1 = first_pose.getOrigin(); 
 		    double len1 = loc1.length(); 
