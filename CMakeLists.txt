@@ -72,7 +72,7 @@ add_executable(featureTracking_ori feature_tracking/featureTracking.cpp)
 # add_executable(test_vo_euler vo/test_vo_euler.cpp vo/projection_euler-ZXY.cpp)
 # add_executable(test_vo_euler_ip vo/test_vo_euler_ip.cpp vo/projection_euler-ZXY.cpp)
 # add_executable(test_vo_quaternion vo/test_vo_quaternion.cpp vo/projection_quat.cpp)
-# add_executable(test_vo_quaternion_ip vo/test_vo_quaternion_ip.cpp vo/projection_quat.cpp)
+add_executable(test_vo_quaternion_ip vo/test_vo_quaternion_ip.cpp vo/projection_quat.cpp)
 add_executable(visual_odometry vo/visual_odometry.cpp vo/visual_odometry_node.cpp vo/stereo_triangulate.cpp)
 add_executable(test_triangulate vo/test_triangulate.cpp vo/stereo_triangulate.cpp)
 
@@ -80,6 +80,9 @@ add_executable(test_triangulate vo/test_triangulate.cpp vo/stereo_triangulate.cp
 ## depth handler
 add_executable(depth_handler vo/depth_handler_node.cpp vo/depth_handler.cpp )
 # add_executable(test_depth_process vo/test_depth_process.cpp)
+
+## vio
+add_executable(test_vio_proj_factor vio/test_projection.cpp vio/projection_quat.cpp)
 
 # target_link_libraries(featureTracking ${catkin_LIBRARIES} ${OpenCV_LIBS})
 # add_executable(visualOdometry src/visualOdometry.cpp)

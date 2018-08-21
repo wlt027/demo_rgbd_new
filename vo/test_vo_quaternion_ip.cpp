@@ -219,7 +219,7 @@ Eigen::Vector7d vo_ceres(vector<ip_M>& vip, Eigen::Vector7d& inipose)
     //loss_function = new ceres::HuberLoss(1.0);
     loss_function = new ceres::CauchyLoss(1.0);
     // these variables needs to be global or static 
-    static double para_pose[0][7]; 
+    static double para_pose[1][7]; 
 
     int N = vip.size(); 
     for(int i=0; i<7; i++)
