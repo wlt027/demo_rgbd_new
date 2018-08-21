@@ -29,7 +29,7 @@ class ProjectionFactor_Y2 : public ceres::SizedCostFunction<1, 7, 7, 7, 1>
 };
 
 /*
-class ProjectionFactor_Y3 : public ceres::SizedCostFunction<1, 7>
+class ProjectionFactor_Y34 : public ceres::SizedCostFunction<2, 7, 7, 7, 1>
 {
   public:
     ProjectionFactor_Y3(const Eigen::Vector3d &_pts_i, const Eigen::Vector3d &_pts_j);

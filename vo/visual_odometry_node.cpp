@@ -57,8 +57,11 @@ void imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& imagePoints2)
     voData.pose.pose.position.z = t.getZ(); 
     voDataPubPointer->publish(voData);
     
-    cout<<"vo node at "<<std::fixed<<voData.header.stamp.toSec()<<" vo result: "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl;
+    // cout<<"vo node at "<<std::fixed<<voData.header.stamp.toSec()<<" vo result: "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl;
 
+    cout <<"vo publish: vo t "<<t.getX()<<" "<<t.getY() <<" "<<t.getZ()<<endl;
+    cout <<"vo publish: vo q "<< q.getX()<<" "<< q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl;
+    
     // broadcast voTrans 
     tf::StampedTransform voTrans;
     voTrans.frame_id_ = "/camera_init";

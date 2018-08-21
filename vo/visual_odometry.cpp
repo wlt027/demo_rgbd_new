@@ -58,7 +58,7 @@ mPCTime(0),
 mPC(new pcl::PointCloud<pcl::PointXYZI>),
 mKDTree(new pcl::KdTreeFLANN<pcl::PointXYZI>),
 mZoomDis(10.),
-mdisThresholdForTriangulation(0.1), // 1.
+mdisThresholdForTriangulation(1.), // 1.
 mFtObsCurr(new pcl::PointCloud<ImagePoint>),
 mFtObsLast(new pcl::PointCloud<ImagePoint>),
 mImagePointsProj(new pcl::PointCloud<pcl::PointXYZ>)
@@ -118,6 +118,7 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
     int cnt_matched = 0; 
     int cnt_no_depth = 0; 
     int cnt_with_depth = 0; 
+    int cnt_with_depth_tri = 0; 
     for(int i=0; i<imgPTLastNum; i++)
     {
 	bool ipFound = false; 
@@ -207,12 +208,10 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 		}else{
 		    ipr.s = 0; 
 		    ipr.v = ip_M::NO_DEPTH; 
-		    ++cnt_no_depth; 
 		}
 	    }else{
 		ipr.s = 0; 
 		ipr.v = ip_M::NO_DEPTH;
-		++cnt_no_depth; 
 	    }
 		
 	    // if no depth 
@@ -224,7 +223,7 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 		tf::Vector3 dis_ = mLastPose.getOrigin() - first_pose.getOrigin(); 
 		// tf::Transform T21 = mLastPose.inverse()*first_pose; 
 		tf::Transform T12 = first_pose.inverse()*mLastPose; 
-		tf::Transform I; 
+		tf::Transform I(tf::Quaternion(0, 0, 0, 1), tf::Vector3(0, 0, 0)); 
 		// cout<<"dis_: "<<dis_.getX()<<" "<<dis_.getY()<<" "<<dis_.getZ()<<" len: "<<dis_.length()<<endl;
 		if(dis_.length() >= mdisThresholdForTriangulation) 
 		{
@@ -234,29 +233,29 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 		    // Eigen::Vector3d pt_2 = stereo_triangulate(T21, I, p1, p2); 
 		    Eigen::Vector3d pt_2 = stereo_triangulate(T12, I, p1, p2); 
 		    // cout<<" vo tri: at "<<std::fixed<<mTimeLast<<" u0 = "<<p1(0)<<" v0 "<<p1(1)<<" u1 "<<p2(0)<<" v1 "<<p2(1)<<endl;
-		    tf::Vector3 loc1 = first_pose.getOrigin(); 
-		    double len1 = loc1.length(); 
-		    cout<<" first pose: "<<loc1.getX()<<" "<<loc1.getY()<<" "<<loc1.getZ()<<" ";
-		    loc1 = mLastPose.getOrigin(); 
-		    cout<<" now pose: "<<loc1.getX()<<" "<<loc1.getY()<<" "<<loc1.getZ()<<endl;
-		    cout<<" triangulate s = "<<ipr.s<<endl;
+		    // tf::Vector3 loc1 = first_pose.getOrigin(); 
+		    // double len1 = loc1.length(); 
+		    // cout<<" first pose: "<<loc1.getX()<<" "<<loc1.getY()<<" "<<loc1.getZ()<<" ";
+		    // loc1 = mLastPose.getOrigin(); 
+		    // cout<<" now pose: "<<loc1.getX()<<" "<<loc1.getY()<<" "<<loc1.getZ()<<endl;
+		    // cout<<" triangulate s = "<<ipr.s<<endl;
 
 		    double depth = pt_2(2); 
-
-		    if(len1 == 0.)
-		    {
-			static ofstream ouf("tri_new.log"); 
-			tf::Quaternion q = mLastPose.getRotation(); 
-			if(ipr.ind <= 0)
-			    ouf<<std::fixed<<mTimeCurr<<" "<<ipr.ind<<" "<<depth<<" "<<p1(0)<<" "<<p1(1)<<" "<<p2(0)<<" "<<p2(1)<<" "<<loc1.getX()<<" "<<loc1.getY()<<"  "<<loc1.getZ()<<" "<<q.getX()<<" "<<q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl; 
-		    }
+//
+//		    if(len1 == 0.)
+//		    {
+//			static ofstream ouf("tri_new.log"); 
+//			tf::Quaternion q = mLastPose.getRotation(); 
+//			if(ipr.ind <= 0)
+//			    ouf<<std::fixed<<mTimeCurr<<" "<<ipr.ind<<" "<<depth<<" "<<p1(0)<<" "<<p1(1)<<" "<<p2(0)<<" "<<p2(1)<<" "<<loc1.getX()<<" "<<loc1.getY()<<"  "<<loc1.getZ()<<" "<<q.getX()<<" "<<q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl; 
+//		    }
 
 		    if(depth > 0.5 && depth < 50)
 		    {
 			ipr.s = depth; 
 			ipr.v = ip_M::DEPTH_TRI; 
-			--cnt_no_depth; 
-			++cnt_with_depth;
+			// ++cnt_with_depth;
+			++cnt_with_depth_tri; 
 		    }	
 		}
 
@@ -277,19 +276,21 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 		    ipr.v = ip_M::DEPTH_TRI;
 		}
 	    }
+	    if(ipr.v == ip_M::NO_DEPTH)
+		++cnt_no_depth;
 	    ipr.ind = mImgPTLast->points[i].ind; 
 	    ipRelations.push_back(ipr); 
 	    // ipInd.push_back(mImgPTLast->points[i].ind); 
 	}
     }
     
-    cout <<"vo at "<<std::fixed<<mTimeCurr<<" has found "<<cnt_matched<<" matches, with depth: "<<cnt_with_depth<<" no depth: "<<cnt_no_depth<<endl;
+    cout <<"vo at "<<std::fixed<<mTimeCurr<<" has found "<<cnt_matched<<" matches, with measured depth: "<<cnt_with_depth<<" triangulated depth: "<<cnt_with_depth_tri<<" no depth: "<<cnt_no_depth<<endl;
 
     // solve VO 
     Eigen::Matrix<double, 7, 1> vo_p; 
     vo_p << 0, 0, 0, 0, 0, 0, 1;
     int iter = 0; 
-    int maxIterNum = 150; 
+    int maxIterNum = 100; // 150 
     
     // pcl::PointCloud<pcl::PointXYZHSV>::Ptr ipRelations2(new pcl::PointCloud<pcl::PointXYZHSV>());
     // vector<ip_M> ipRelations2; 
@@ -366,11 +367,13 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 		    vjq.push_back(jq); 
 		    meanValWithDepth += val; 
 		    ptNumWithDepth++; 
+		}else{
+		    ipRelations[i].v = ip_M::INVALID; 
 		}
 	    }
 	}
 	
-	meanValWithDepth /= (ptNumWithDepth+0.001); 
+	meanValWithDepth /= (ptNumWithDepth+0.01); 
 	
 	ptNumNoDepthRec = ptNumNoDepth;
 	ptNumWithDepthRec = ptNumWithDepth; 
@@ -475,7 +478,8 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 	    }   
 	}
 	
-	// for debug 
+	// for debug
+	/*
 	if(mCurrPose.getOrigin().length() == 0.)
 	{
 	    static ofstream ouf("ori_pt_new.log");
@@ -485,7 +489,7 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
 		if(pt.ind <= 0)
 		   ouf<<std::fixed<<mTimeCurr<<" "<<pt.ind<<" "<<pt.u<<" "<<pt.v<<endl; 
 	    }
-	}
+	}*/
 
 	mFtTransLast.clear(); 
 	mFtObsLast->clear(); 
@@ -520,7 +524,7 @@ void VisualOdometry::depthCloudHandler(const sensor_msgs::PointCloud2ConstPtr& d
     mPC->clear(); 
     pcl::fromROSMsg(*depthCloud2, *mPC); 
     int depthCloudNum = mPC->points.size(); 
-    // cout <<"vo receive dpt has: "<<depthCloudNum<<" points!"<<endl;
+    cout <<"vo receive "<<std::fixed<< mPCTime<<" dpt has: "<<depthCloudNum<<" points!"<<endl;
     if(depthCloudNum > 20)
     {
 	for(int i=0; i<depthCloudNum; i++)

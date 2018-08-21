@@ -49,7 +49,7 @@ void CTrackerParam::defaultInit()
     mSubregionHeight = (double) (mHeight - 2*mYBoundary) / (double)(mYSubregionNum); 
     
     mHarrisThreshold = 1e-6; // 1e-6;    
-    mMinDist = 10.0;
+    mMinDist = 20.0;
 }
 
 CFeatureTracker::CFeatureTracker()

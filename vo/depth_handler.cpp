@@ -152,7 +152,6 @@ void DepthHandler::voDataHandler(const nav_msgs::Odometry::ConstPtr& vo_trans)
 
     tf::Transform Tj = currPose; 
     tf::Transform Tij = mLastPose.inverse() * currPose; 
-    mLastPose = currPose; 
     tf::Transform Tji = Tij.inverse(); 
     pcl::PointCloud<pcl::PointXYZI>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZI>); 
 
@@ -181,7 +180,7 @@ void DepthHandler::voDataHandler(const nav_msgs::Odometry::ConstPtr& vo_trans)
 	double ratio = (time - mCloudStamp[mRegCloudId])/(time - mTimeRec); 
 	ratio = ratio > 1 ? 1:ratio; 
 	ratio = ratio < 0 ? 0:ratio; 
-	tf::Quaternion qt = qi.slerp(qj, 1 - ratio); 
+	tf::Quaternion qt = (qi.slerp(qj, 1 - ratio)).normalized(); 
 	tf::Vector3 tt = ti.lerp(tj, 1 - ratio); 
 	tf::Transform Tt(qt, tt); 
 	tf::Transform Tjt = Tj.inverse() * Tt; 
@@ -241,6 +240,7 @@ void DepthHandler::voDataHandler(const nav_msgs::Odometry::ConstPtr& vo_trans)
 	mCloudPub->points[i].intensity = mZoomDis;
     }
     mTimeRec = time; 
+    mLastPose = currPose; 
     // cout <<"DP: after downsample again depth cloud has "<<tempCloud2Num<<" points to publish "<<endl;
 }
 
