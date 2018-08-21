@@ -40,6 +40,8 @@ bool ProjectionFactor_Y2::Evaluate(double const *const *parameters, double *resi
 
     Eigen::Quaterniond Qij_c = (Qi_c.inverse()*Qj_c).normalized(); 
     Eigen::Vector3d Pij_c = Qi_c.inverse()*(Pj_c - Pi_c); 
+    // Eigen::Quaterniond Qji_c = (Qj_c.inverse()*Qi_c).normalized(); 
+    // Eigen::Vector3d Pji_c = Qj_c.inverse()*(Pi_c - Pj_c); 
 
     double tx = Pij_c(0);   // x
     double ty = Pij_c(1);   // y
@@ -52,9 +54,11 @@ bool ProjectionFactor_Y2::Evaluate(double const *const *parameters, double *resi
     Eigen::Quaterniond q(qw, qx, qy, qz); 
     Eigen::Matrix<double, 3, 3> R = q.toRotationMatrix(); 
 
-    double u0 = pts_i(0); double v0 = pts_i(1); 
-    double u1 = pts_j(0); double v1 = pts_j(1); 
-    
+    // double u0 = pts_i(0); double v0 = pts_i(1); 
+    // double u1 = pts_j(0); double v1 = pts_j(1); 
+    double u0 = pts_j(0); double v0 = pts_j(1); 
+    double u1 = pts_i(0); double v1 = pts_i(1);
+
     double tmp1 = -tz * v1 + ty; 
     double tmp2 =  u1 * tz - tx;
     double tmp3 = -u1 * ty + v1 * tx;

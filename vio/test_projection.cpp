@@ -54,11 +54,14 @@ void test_ceres()
 {
     // 1. read features 
     vector<ip_M> vip ;
-    // read_iprelation_log(vip, log_file); 
-    Eigen::Matrix<double, 7, 1> pose; 
-    pose << 0.2, 0.5, -0.3, 0.23, 0.1, -0.3, sqrt(1-SQ(0.23)-SQ(0.1)-SQ(0.3));
-    cout<<"true pose: "<<endl<<pose<<endl;
-    random_iprelation(vip, pose);    
+    read_iprelation_log(vip, log_file); 
+    if(0)
+    {
+	Eigen::Matrix<double, 7, 1> pose; 
+	pose << 0.2, 0.5, -0.3, 0.23, 0.1, -0.3, sqrt(1-SQ(0.23)-SQ(0.1)-SQ(0.3));
+	cout<<"true pose: "<<endl<<pose<<endl;
+	random_iprelation(vip, pose);    
+    }
     Eigen::Matrix<double, 7, 1> pnp_vo;
     vo_pnp(vip, pnp_vo);
     cout<<"pnp pose: "<<endl<<pnp_vo<<endl;
@@ -94,7 +97,7 @@ void test_ceres()
     for(int i=0; i<7; i++)
     {
 	para_pose[0][i] = inipose[i]; 
-	para_pose[1][i] = tmppose[i]; 
+	para_pose[1][i] = inipose[i]; // pnp_vo[i]; // pose[i]; // tmppose[i]; 
 	ex_para_pose[0][i] = inipose[i]; 
     }
 
@@ -114,7 +117,7 @@ void test_ceres()
 	if(pt.v == ip_M::NO_DEPTH)
 	{
 	    feat_dis[i][0] = INIT_DIS; 
-	    ProjectionFactor_Y2 * f= new ProjectionFactor_Y2(np2, np1); 
+	    ProjectionFactor_Y2 * f= new ProjectionFactor_Y2(np1, np2); 
 	    problem.AddResidualBlock(f, loss_function, para_pose[0], para_pose[1], ex_para_pose[0], feat_dis[i]); 
 	}else if(pt.v == ip_M::DEPTH_MES || pt.v == ip_M::DEPTH_TRI)
 	{
@@ -124,11 +127,11 @@ void test_ceres()
 //
 //	    ProjectionFactor_Y4 * f4 = new ProjectionFactor_Y4(np1, np2); 
 //	    problem.AddResidualBlock(f4, loss_function, para_pose[0]); 
-	    feat_dis[i][0] = 1./pt.sj; 
-	    // ProjectionFactor * f = new ProjectionFactor(np1, np2); 
-	    ProjectionFactor * f = new ProjectionFactor(np2, np1); 
+	    feat_dis[i][0] = 1./pt.s; 
+	    ProjectionFactor * f = new ProjectionFactor(np1, np2); 
 	    f->sqrt_info = 240 * Eigen::Matrix2d::Identity(); 
 	    problem.AddResidualBlock(f, loss_function, para_pose[0], para_pose[1], ex_para_pose[0], feat_dis[i]);
+	    problem.SetParameterBlockConstant(feat_dis[i]);
 	}	
     }   
 
@@ -234,8 +237,8 @@ void vo_pnp(vector<ip_M>& vip, Eigen::Matrix<double, 7, 1>& pose)
     for(int i=0; i<N; i++)
     {
 	ip_M& m = vip[i];
-	SRC_PTS.col(i) = Eigen::Vector3d(m.ui*m.s, m.vi*m.s, m.s); 
-	DPT_PTS.col(i) = Eigen::Vector3d(m.uj*m.sj, m.vj*m.sj, m.sj);
+	DPT_PTS.col(i) = Eigen::Vector3d(m.ui*m.s, m.vi*m.s, m.s); 
+	SRC_PTS.col(i) = Eigen::Vector3d(m.uj*m.sj, m.vj*m.sj, m.sj);
     } 
     
     Eigen::Matrix<double, 4, 4> T = Eigen::umeyama(SRC_PTS, DPT_PTS, false); // scaling = false 
@@ -256,7 +259,7 @@ void random_iprelation(vector<ip_M>& vip, Eigen::Matrix<double, 7, 1>& pose)
 
     static std::uniform_real_distribution<> uni_dis(-1.0, 1.0);
     static std::uniform_real_distribution<> uni_z(1., 5.); 
-    static std::normal_distribution<> noise{0,0.01};
+    static std::normal_distribution<> noise{0,0.02};
     static std::uniform_real_distribution<> rangle(-5., 5.); 
     static std::uniform_real_distribution<> rdis(-0.2, 0.2); 
     
@@ -269,15 +272,15 @@ void random_iprelation(vector<ip_M>& vip, Eigen::Matrix<double, 7, 1>& pose)
 	Eigen::Vector3d p1; 
 	p1 << uni_dis(gen), uni_dis(gen), 1.0; 
 	p1 = p1 * (uni_z(gen) + 1.); 
-	Eigen::Vector3d p2 = q * p1 + t; 
-	p2(0) += noise(gen); 
-	p2(1) += noise(gen); 
-	p2(2) += noise(gen); 
-	if(p1(2) <= 0.3 || p2(2) <= 0.3)
+	Eigen::Vector3d p0 = q * p1 + t; 
+	p0(0) += noise(gen); 
+	p0(1) += noise(gen); 
+	p0(2) += noise(gen); 
+	if(p1(2) <= 0.3 || p0(2) <= 0.3)
 	    continue; 
 	ip_M m; 
-	m.ui = p1.x()/p1.z(); m.vi = p1.y()/p1.z(); m.s = p1.z(); 
-	m.uj = p2.x()/p2.z(); m.vj = p2.y()/p2.z(); m.sj = p2.z(); 
+	m.ui = p0.x()/p0.z(); m.vi = p0.y()/p0.z(); m.s = p0.z(); 
+	m.uj = p1.x()/p1.z(); m.vj = p1.y()/p1.z(); m.sj = p1.z(); 
 	if(k > NUM/2)
 	    m.v = ip_M::NO_DEPTH;
 	else

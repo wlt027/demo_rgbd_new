@@ -47,7 +47,7 @@ struct Jacob_Q{
 
 
 
-double depth_ratio = 0.7; 
+double depth_ratio = 0.1; 
 
 void vo_pnp(std_3d& pts1, std_3d& pts2, Eigen::Matrix<double, 7, 1>& );
 Eigen::Vector7d vo_ceres(std_3d& pts1, std_3d& pts2, Eigen::Vector7d& inipose);
@@ -73,7 +73,7 @@ int main(int argc, char* argv[])
 
 void test_vo()
 {
-    int NUM = 100; 
+    int NUM = 1; // 100 
     double err_pnp = 0; 
     double err_vo_demo = 0; 
     double err_vo_ceres = 0;
@@ -84,7 +84,7 @@ void test_vo()
 
     std::uniform_real_distribution<> uni_dis(-1.0, 1.0);
     std::uniform_real_distribution<> uni_z(1., 5.); 
-    std::normal_distribution<> noise{0,0.02};
+    std::normal_distribution<> noise{0,0.00};
     std::uniform_real_distribution<> rangle(-5., 5.); 
     std::uniform_real_distribution<> rdis(-0.2, 0.2); 
 
@@ -105,6 +105,7 @@ void test_vo()
 	Eigen::Quaterniond q(R); 
 	pose << t(0), t(1), t(2), q.x(), q.y(), q.z(), q.w();
 	Eigen::Vector6d euler_pose = poseFromQuat2Euler(pose); 
+	cout <<"pose: "<<pose<<endl;
 
 	int N = 40; 
 	std_3d PT1(N); 
@@ -154,7 +155,7 @@ void test_vo()
 	// vo_ceres 
 	vo_p = vo_ceres(PT1, PT2, inipose);
 	// Eigen::Vector6d vo_p_e = poseFromQuat2Euler(vo_p); 
-	// cout <<"ceres vo_p: "<<endl<<vo_p<<endl; 
+	cout <<"ceres vo_p: "<<endl<<vo_p<<endl; 
 	delta_p = vo_p - pose; 
 	// delta_p = vo_p_e - euler_pose; 
 	// cout <<"err_norm: "<<delta_p.norm()<<endl;
