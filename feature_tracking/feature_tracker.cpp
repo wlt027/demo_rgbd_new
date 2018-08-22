@@ -27,19 +27,19 @@ void CTrackerParam::defaultInit()
     mXBoundary = 20; 
     mYBoundary = 20;
     
-    mShowSkipNum = 2; // 2; 
+    mShowSkipNum = 0; // 2; // 2; 
     mShowDSRate = 2; 
-    mbShowTrackedResult = false; // whether to show feature track result 
+    mbShowTrackedResult = true; // whether to show feature track result 
 
     mMaxTrackDis = 100; 
     mTrackWinSize = 15; 
     
     mbEqualized = false; // true; //false; 
     
-    mfx = 525.; // 617.306; // 525; 
-    mfy = 525.; // 617.714; // 525;
-    mcx = 319.5; // 326.245; // 319.5; 
-    mcy = 239.974; // 239.5; 
+    mfx = 617.306; // 525.; // 617.306; // 525; 
+    mfy = 617.714; // 525.; // 617.714; // 525;
+    mcx = 326.245; // 319.5; // 326.245; // 319.5; 
+    mcy = 239.5; // 239.974; // 239.5; 
     mk[0] = 0; mk[1] = 0; 
     mp[0] = 0; mp[1] = 0; 
     mWidth = 640; 
@@ -48,7 +48,7 @@ void CTrackerParam::defaultInit()
     mSubregionWidth = (double)(mWidth - 2*mXBoundary) / (double)(mXSubregionNum); 
     mSubregionHeight = (double) (mHeight - 2*mYBoundary) / (double)(mYSubregionNum); 
     
-    mHarrisThreshold = 1e-6; // 1e-6;    
+    mHarrisThreshold = 1e-8; // 1e-6; // 1e-6;    
     mMinDist = 20.0;
 }
 
@@ -262,7 +262,8 @@ bool CFeatureTracker::handleImage(const cv::Mat& _img, double img_time)
     mPreTotalFeatureNum = featureCount; 
     mvCurPts.resize(featureCount); 
 
-    ROS_DEBUG("feature_tracker cost: %f", t_ft.toc()); 
+    static int cnt = 0; 
+    ROS_DEBUG("feature_tracker num %d at time %lf cost: %f", ++cnt, mTimePre, t_ft.toc()); 
 
     // publish for showing 
     mShowCnt = (mShowCnt + 1) % (mParam.mShowSkipNum + 1);     

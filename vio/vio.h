@@ -59,7 +59,7 @@ public:
 
     void setParameter();
     void setPointCloudAt(double); 
-
+    void prepareForDisplay(vector<ip_M>& ipRelations);
 
     volatile bool mbInited;  
 
@@ -114,7 +114,7 @@ public:
     Vector3d acc_0; 
     Vector3d gyr_0; 
  
-    IntegrationBase * tmp_pre_integration;  
+    // IntegrationBase * tmp_pre_integration;  
     IntegrationBase * pre_integrations[WN+1]; 
     vector<double> dt_buf[WN+1]; 
     vector<Eigen::Vector3d> linear_acceleration_buf[WN+1]; 

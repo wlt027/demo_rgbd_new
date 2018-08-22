@@ -26,7 +26,7 @@ int main(int argc, char** argv)
   
   ros::Subscriber voDataSub = nh.subscribe<nav_msgs::Odometry> ("/cam_to_init", 5, voDataHandler);
   ros::Subscriber syncCloudSub = nh.subscribe<sensor_msgs::Image>
-	("/camera/depth_registered/image", 5, syncCloudHandler);
+	("/cam0/depth", 5, syncCloudHandler);
 
   ros::Publisher depthCloudPub = nh.advertise<sensor_msgs::PointCloud2> ("/depth_cloud", 5);
   depthCloudPubPointer = &depthCloudPub;

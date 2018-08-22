@@ -105,6 +105,7 @@ std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointC
 getMeasurements();
 void process(); 
 void process_depthcloud();
+void imageDataHandler(const sensor_msgs::Image::ConstPtr& imageData);
 
 int main(int argc, char **argv)
 {
@@ -134,11 +135,14 @@ int main(int argc, char **argv)
 
     ros::Publisher imagePointsProjPub = nh.advertise<sensor_msgs::PointCloud2> ("/image_points_proj", 1);
     imagePointsProjPubPointer = &imagePointsProjPub;
+    
+    ros::Publisher voDataPub = nh.advertise<nav_msgs::Odometry> ("/cam_to_init", 5);
+    voDataPubPointer = &voDataPub;
 
-    // ros::Subscriber imageDataSub = nh.subscribe<sensor_msgs::Image>("/image/show", 1, imageDataHandler);
+    ros::Subscriber imageDataSub = nh.subscribe<sensor_msgs::Image>("/image/show", 1, imageDataHandler);
 
-    // ros::Publisher imageShowPub = nh.advertise<sensor_msgs::Image>("/image/show_2", 1);
-    // imageShowPubPointer = &imageShowPub;
+    ros::Publisher imageShowPub = nh.advertise<sensor_msgs::Image>("/image/show_2", 1);
+    imageShowPubPointer = &imageShowPub;
 
     std::thread measurement_process{process};
     std::thread depthcloud_process{process_depthcloud}; 
@@ -162,6 +166,8 @@ void process_depthcloud()
 		}
 		return depth_pc.size() > 0;
 	    });
+    lk.unlock();
+
 	for(int i=0; i<depth_pc.size(); i++)
 	    vio.processDepthCloud(depth_pc[i]);
     }
@@ -179,7 +185,7 @@ void process()
                  });
         lk.unlock();
 
-	for (auto &measurement : measurements)
+	   for (auto &measurement : measurements)
         {
             for (auto &imu_msg : measurement.first)
                 send_imu(imu_msg);
@@ -195,7 +201,47 @@ void process()
 	    sum_vo_t += whole_t; 
 	    ROS_DEBUG("vio_node.cpp: average vo cost %f ms", sum_vo_t/(++sum_vo_cnt));
 
-	    // PUB MSG? 
+
+        // publish msg voData 
+        nav_msgs::Odometry voData; 
+        voData.header.frame_id = "/camera_init"; 
+        voData.header.stamp = img_msg->header.stamp;
+        voData.child_frame_id = "/camera";
+     
+        tf::Quaternion q = vio.mCurrPose.getRotation(); 
+        tf::Vector3 t = vio.mCurrPose.getOrigin(); 
+        voData.pose.pose.orientation.x = q.getX(); 
+        voData.pose.pose.orientation.y = q.getY(); 
+        voData.pose.pose.orientation.z = q.getZ(); 
+        voData.pose.pose.orientation.w = q.getW(); 
+        voData.pose.pose.position.x = t.getX(); 
+        voData.pose.pose.position.y = t.getY();
+        voData.pose.pose.position.z = t.getZ(); 
+        voDataPubPointer->publish(voData);
+        
+        // cout<<"vo node at "<<std::fixed<<voData.header.stamp.toSec()<<" vo result: "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl;
+
+        cout <<"vio publish: vio t "<<t.getX()<<" "<<t.getY() <<" "<<t.getZ()<<endl;
+        cout <<"vio publish: vio q "<< q.getX()<<" "<< q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl;
+        
+        // broadcast voTrans 
+        tf::StampedTransform voTrans;
+        voTrans.frame_id_ = "/camera_init";
+        voTrans.child_frame_id_ = "/camera";
+        voTrans.stamp_ = img_msg->header.stamp;
+        voTrans.setRotation(q); 
+        voTrans.setOrigin(t); 
+        tfBroadcasterPointer->sendTransform(voTrans); 
+        
+        // TODO: handle msg depth point
+
+        // deal with image
+        sensor_msgs::PointCloud2 imagePointsProj2;
+        pcl::toROSMsg(*(vio.mImagePointsProj), imagePointsProj2);
+        imagePointsProj2.header.frame_id = "camera";
+        imagePointsProj2.header.stamp = ros::Time().fromSec(vio.mTimeLast);
+        imagePointsProjPubPointer->publish(imagePointsProj2);    
+
 	}
     }
 }
@@ -238,4 +284,39 @@ getMeasurements()
     return measurements;
 }
 
+
+void imageDataHandler(const sensor_msgs::Image::ConstPtr& imageData) 
+{
+    cv_bridge::CvImagePtr ptr = cv_bridge::toCvCopy(imageData, "bgr8");
+
+    cv::Mat show_img = ptr->image; 
+
+    // double kImage[9] = {525.0, 0.0, 319.5, 0.0, 525.0, 239.5, 0.0, 0.0, 1.0};
+    double kImage[9] = {617.306, 0.0, 326.245, 0.0, 617.714, 239.974, 0.0, 0.0, 1.0};
+    double showDSRate = 2.;
+    vector<ip_M> ipRelations = vio.mPtRelations; 
+    int ipRelationsNum = ipRelations.size();
+    // cout<<"vo_node display image at "<<std::fixed<<imageData->header.stamp.toSec()<<endl;
+    for (int i = 0; i < ipRelationsNum; i++) 
+    {
+    ip_M pt = ipRelations[i];
+    if ( pt.v == ip_M::NO_DEPTH) 
+    {   
+        // cout<<"No depth: pt.uj = "<<(kImage[2] - pt.uj * kImage[0])<<" pt.vj: "<<(kImage[5] - pt.vj * kImage[4]) <<" pt.s = "<<pt.s<<endl;
+        cv::circle(show_img, cv::Point((kImage[2] + pt.uj * kImage[0]) / showDSRate, (kImage[5] + pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(255, 0, 0), 2);
+    } else if (pt.v == ip_M::DEPTH_MES) {
+        // cout<<"Depth MES: pt.uj = "<<(kImage[2] - pt.uj * kImage[0])<<" pt.vj: "<<(kImage[5] - pt.vj * kImage[4]) <<" pt.s = "<<pt.s<<endl;
+        cv::circle(show_img, cv::Point((kImage[2] + pt.uj * kImage[0]) / showDSRate,(kImage[5] + pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(0, 255, 0), 2);
+    } else if (pt.v == ip_M::DEPTH_TRI) {
+        // cout<<"Depth TRI: pt.uj = "<<(kImage[2] - pt.uj * kImage[0])<<" pt.vj: "<<(kImage[5] - pt.vj * kImage[4]) <<" pt.s = "<<pt.s<<endl;
+        cv::circle(show_img, cv::Point((kImage[2] + pt.uj * kImage[0]) / showDSRate,(kImage[5] + pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(0, 0, 255), 2);
+    } /*else {
+        cv::circle(bridge->image, cv::Point((kImage[2] - ipRelations->points[i].z * kImage[0]) / showDSRate,
+        (kImage[5] - ipRelations->points[i].h * kImage[4]) / showDSRate), 1, CV_RGB(0, 0, 0), 2);
+        }*/
+    }
+    ptr->image = show_img; 
+    sensor_msgs::Image::Ptr imagePointer = ptr->toImageMsg();
+    imageShowPubPointer->publish(imagePointer);
+}
 

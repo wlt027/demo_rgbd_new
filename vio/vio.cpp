@@ -48,9 +48,9 @@ void VIO::clearState()
 	pre_integrations[i] = NULL; 
     }
 
-    if(tmp_pre_integration != NULL)
-	delete tmp_pre_integration; 
-    tmp_pre_integration = NULL; 
+ //    if(tmp_pre_integration != NULL)
+	// delete tmp_pre_integration; 
+ //    tmp_pre_integration = NULL; 
 }
 
 void VIO::processIMU(double dt, Vector3d & linear_acceleration, Vector3d& angular_velocity)
@@ -61,7 +61,7 @@ void VIO::processIMU(double dt, Vector3d & linear_acceleration, Vector3d& angula
 	acc_0 = linear_acceleration; 
 	gyr_0 = angular_velocity; 
     }
-    
+
     if(!pre_integrations[frame_count])
     {
 	pre_integrations[frame_count] = new IntegrationBase(acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]); 
@@ -69,12 +69,12 @@ void VIO::processIMU(double dt, Vector3d & linear_acceleration, Vector3d& angula
     if(frame_count != 0)
     {
 	pre_integrations[frame_count]->push_back(dt, linear_acceleration, angular_velocity); 
-	
-	tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity); 
-	dt_buf[frame_count].push_back(dt); 
-	linear_acceleration_buf[frame_count].push_back(linear_acceleration);
-	angular_velocity_buf[frame_count].push_back(angular_velocity);
-	
+
+	// tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity); 
+	// dt_buf[frame_count].push_back(dt); 
+	// linear_acceleration_buf[frame_count].push_back(linear_acceleration);
+	// angular_velocity_buf[frame_count].push_back(angular_velocity);
+
 	int j = frame_count; 
 	Vector3d un_acc_0 = Rs[j] * (acc_0 - Bas[j]) - mg; 
 	Vector3d un_gyr = 0.5 *(gyr_0 + angular_velocity) - Bgs[j]; 
@@ -140,6 +140,7 @@ void VIO::processImage(sensor_msgs::PointCloud2ConstPtr& imagePoints2)
     
     mImgPTLast.swap(mImgPTCurr); 
     mImgPTCurr->clear(); 
+    Headers[frame_count] = imagePoints2->header;
     
     pcl::fromROSMsg(*imagePoints2, *mImgPTCurr); 
     
@@ -162,7 +163,32 @@ void VIO::processImage(sensor_msgs::PointCloud2ConstPtr& imagePoints2)
     
     // for next loop
     prepareNextLoop(); 
+
+    // for display 
+    prepareForDisplay(vip);
+
     return ; 
+}
+
+void VIO::prepareForDisplay(vector<ip_M>& ipRelations)
+{
+    // publish msg done by the node 
+    mImagePointsProj->points.clear(); 
+    for(int i=0; i<ipRelations.size(); i++)
+    {
+    ip_M ipr = ipRelations[i]; 
+    if(ipr.v == ip_M::DEPTH_MES || ipr.v == ip_M::DEPTH_TRI)
+    {
+        pcl::PointXYZ pt; 
+        pt.x = ipr.ui * ipr.s; 
+        pt.y = ipr.vi * ipr.s; 
+        pt.z = ipr.s; 
+        mImagePointsProj->points.push_back(pt); 
+    }
+    }
+
+    // save this for displaying 
+    mPtRelations.swap(ipRelations); 
 }
 
 void VIO::slideWindow()
@@ -173,12 +199,12 @@ void VIO::slideWindow()
     Rs[0] = Rs[1];
     Bas[0] = Bas[1];
     Bgs[0] = Bgs[1]; 
-    dt_buf[0].swap(dt_buf[1]); 
-    linear_acceleration_buf[0].swap(linear_acceleration_buf[1]); 
-    angular_velocity_buf[0].swap(angular_velocity_buf[1]); 
-    dt_buf[1].clear(); 
-    linear_acceleration_buf[1].clear(); 
-    angular_velocity_buf[1].clear(); 
+    // dt_buf[0].swap(dt_buf[1]); 
+    // linear_acceleration_buf[0].swap(linear_acceleration_buf[1]); 
+    // angular_velocity_buf[0].swap(angular_velocity_buf[1]); 
+    // dt_buf[1].clear(); 
+    // linear_acceleration_buf[1].clear(); 
+    // angular_velocity_buf[1].clear(); 
     std::swap(pre_integrations[0], pre_integrations[1]);
     delete pre_integrations[1]; 
     pre_integrations[1] = new IntegrationBase{acc_0, gyr_0, Bas[1], Bgs[1]};
@@ -208,8 +234,9 @@ void VIO::solveOdometry(vector<ip_M>& vip)
 	problem.SetParameterBlockConstant(para_Ex_Pose[0]); 
     }
 
-    // add imu factor 
     priorOptimize(vip); 
+
+    // add imu factor 
     for (int i = 0; i < WN; i++)
     {
 	int j = i + 1;
@@ -218,7 +245,7 @@ void VIO::solveOdometry(vector<ip_M>& vip)
 	IMUFactor* imu_factor = new IMUFactor(pre_integrations[j]);
 	problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
     }
-    
+
     // add feature factor 
     const float INIT_DIS = 10; 
     int N = vip.size(); 
@@ -297,12 +324,13 @@ void VIO::afterOptimize(vector<ip_M>& vip)
 		para_Ex_Pose[i][4],
 		para_Ex_Pose[i][5]).toRotationMatrix();
     }
-    Eigen::Quaterniond q(Rs[1]);
-    mCurrIMUPose = tf::Transform(tf::Quaternion(q.x(), q.y(), q.z(), q.w()), tf::Vector3(Ps[0][0], Ps[0][1], Ps[0][2]));
+    Eigen::Quaterniond q(Rs[WN]);
+    mCurrIMUPose = tf::Transform(tf::Quaternion(q.x(), q.y(), q.z(), q.w()), tf::Vector3(Ps[WN][0], Ps[WN][1], Ps[WN][2]));
 
     q = Eigen::Quaterniond(ric[0]); 
     mTIC = tf::Transform(tf::Quaternion(q.x(), q.y(), q.z(), q.w()), tf::Vector3(tic[0][0], tic[0][1], tic[0][2]));
 
+    mCurrPose = mCurrIMUPose * mTIC; 
     for(int i=0; i<vip.size(); i++)
     {
 	ip_M& m = vip[i];
@@ -356,7 +384,7 @@ void VIO::priorOptimize(vector<ip_M>& vip)
     for(int i=0; i<vip.size() && i< NUM_OF_FEAT; i++)
     {
 	ip_M& m = vip[i]; 
-	para_Feature[i][0] = m.s; 
+	para_Feature[i][0] = 1./m.s; 
     }
 }
 
@@ -406,6 +434,8 @@ void VIO::initialize()
     Bgs[0] = Eigen::Vector3d(gx, gy, gz); 
     mCurrIMUPose = tf::Transform(tf::Quaternion(q.x(), q.y(), q.z(), q.w()), tf::Vector3(0,0,0)); 
     
+    mCurrPose = mCurrIMUPose * mTIC; 
+
     mbInited = true; 
     return ; 
 }
