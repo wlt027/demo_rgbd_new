@@ -66,6 +66,77 @@ mCloudPub(new pcl::PointCloud<pcl::PointXYZI>())
 // template<int CLOUD_NUM>
 DepthHandler::~DepthHandler(){}
 
+void DepthHandler::cloudHandler2(const sensor_msgs::Image::ConstPtr& dpt_img_msg)
+{
+    mCloudCnt = (mCloudCnt+1)%(mCloudSkip+1); 
+    if(mCloudCnt != 0) 
+	return ; 
+    if(mInitTime == -1)
+	mInitTime = dpt_img_msg->header.stamp.toSec(); 
+    double time = dpt_img_msg->header.stamp.toSec(); 
+    double timeElapsed = time - mInitTime; 
+    mSyncCloudId = (mSyncCloudId+1)%(CLOUD_NUM); 
+    mCloudStamp[mSyncCloudId] = time; 
+
+    pcl::PointCloud<pcl::PointXYZI>::Ptr tmpPC(new pcl::PointCloud<pcl::PointXYZI>());
+    double halfDS = mCloudDSRate/2. - 0.5; 
+    
+    cv::Mat dpt_img = cv_bridge::toCvCopy(dpt_img_msg)->image;
+    
+    // 
+   // const float* syncCloud2Pointer = reinterpret_cast<const float*>(&dpt_img_msg->data[0]);
+    float scale = 0.001; 
+    float min_dis = 0.3; 
+    float max_dis = 3;  // keep depth range 
+    for(double i = halfDS; i < dpt_img.rows; i += mCloudDSRate)
+	for(double j = halfDS; j < dpt_img.cols; j += mCloudDSRate)
+	{
+	    int pixelCnt = 0; 
+	    float vd, vd_sum = 0; 
+	    int is = (int)(i - halfDS); int ie = (int)(i + halfDS); 
+	    int js = (int)(j - halfDS); int je = (int)(j + halfDS);
+	    for(int ii = is; ii<= ie; ii++)
+		for(int jj = js; jj<= je; jj++)
+		{
+		    unsigned short _dpt = dpt_img.at<unsigned short>(ii, jj); 
+		    vd = _dpt * scale; 
+		    // vd = syncCloud2Pointer[ii * dpt_img.cols + jj]; 
+		    if(vd > min_dis && vd < max_dis)
+		    {
+			pixelCnt++; 
+			vd_sum += vd; 
+		    }
+		}
+	    if(pixelCnt > 0)
+	    {
+		double u = (j - mk[2])/mk[0];
+		double v = (i - mk[3])/mk[1]; 
+		double mean_vd = vd_sum / pixelCnt; 
+		pcl::PointXYZI pt;
+		pt.x = u * mean_vd; 
+		pt.y = v * mean_vd;
+		pt.z = mean_vd; 
+		pt.intensity = timeElapsed;
+		tmpPC->points.push_back(pt); 
+	    }
+	}
+    
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloudPointer = mCloudArray[mSyncCloudId]; 
+    cloudPointer->clear();
+    
+    // cout <<std::fixed<<"depth_handler.cpp: receive "<<time<<" input "<<tmpPC->points.size()<<" points!"<<endl; 
+
+    pcl::VoxelGrid<pcl::PointXYZI> downSizeFilter;
+    downSizeFilter.setInputCloud(tmpPC);
+    downSizeFilter.setLeafSize(0.1, 0.1, 0.1);
+    downSizeFilter.filter(*cloudPointer);
+    
+    // cout <<"depth_handler.cpp: after downsampling cloudPointer has "<<cloudPointer->points.size()<<" points!"<<endl;
+
+    return ; 
+
+}
+
 // template<int CLOUD_NUM>
 void DepthHandler::cloudHandler(const sensor_msgs::Image::ConstPtr& dpt_img_msg)
 {

@@ -22,6 +22,8 @@ public:
     DepthHandler();
     ~DepthHandler(); 
     void cloudHandler(const sensor_msgs::Image::ConstPtr& dpt_img); 
+    void cloudHandler2(const sensor_msgs::Image::ConstPtr& dpt_img);
+
     void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData);
 
     int mCloudCnt; 	// number of cloud 

@@ -83,15 +83,7 @@ void VisualOdometry::imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& 
     mImgPTCurr->clear(); 
     
     pcl::fromROSMsg(*imagePoints2, *mImgPTCurr); 
-    for(int i=0 ;i<mImgPTCurr->points.size(); i++)
-    {
-	if(mImgPTCurr->points[i].ind == 0)
-	    cout << "id 0 input: "<<mImgPTCurr->points[i].u<<" "<<mImgPTCurr->points[i].v<<endl;
-
-    }
-    // cout<<"vo: receive msg at "<<std::fixed<<mTimeCurr<<" first and last pt: "<<mImgPTCurr->points[0].u<<" "<<mImgPTCurr->points[0].v<<
-    //	" "<<mImgPTCurr->points[mImgPTCurr->points.size()-1].u<<" "<<mImgPTCurr->points[mImgPTCurr->points.size()-1].v<<endl;
-
+    
     int imgPTLastNum = mImgPTLast->points.size(); 
     int imgPTCurrNum = mImgPTCurr->points.size();
 
