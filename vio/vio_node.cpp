@@ -53,7 +53,7 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
     m_buf.unlock();
     con.notify_one();
     
-    cout <<"receive imu msg at "<<std::fixed<<imu_msg->header.stamp.toSec()<<endl; 
+    // cout <<"receive imu msg at "<<std::fixed<<imu_msg->header.stamp.toSec()<<endl; 
 
     {/* // Not need to publish state at imu's speed
 	std::lock_guard<std::mutex> lg(m_state);
@@ -71,7 +71,7 @@ void imagePointsHandler(const sensor_msgs::PointCloud2ConstPtr& imagePoints2)
     feature_buf.push(imagePoints2);
     m_buf.unlock();
     con.notify_one();
-    cout <<"receive img msg at "<<std::fixed<<imagePoints2->header.stamp.toSec()<<endl; 
+    // cout <<"receive img msg at "<<std::fixed<<imagePoints2->header.stamp.toSec()<<endl; 
 }
 
 void depthCloudHandler(const sensor_msgs::PointCloud2ConstPtr& depthCloud2)
@@ -80,7 +80,7 @@ void depthCloudHandler(const sensor_msgs::PointCloud2ConstPtr& depthCloud2)
     dpt_buf.push(depthCloud2); 
     m_dpt_buf.unlock(); 
     con_dpt.notify_one();
-    cout <<"receive dpt msg at "<<std::fixed<<depthCloud2->header.stamp.toSec()<<endl; 
+    // cout <<"receive dpt msg at "<<std::fixed<<depthCloud2->header.stamp.toSec()<<endl; 
 }
 
 void send_imu(const sensor_msgs::ImuConstPtr &imu_msg)

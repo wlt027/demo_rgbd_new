@@ -27,7 +27,7 @@ std::string IMU_TOPIC;
 int IMAGE_ROW, IMAGE_COL;
 std::string VINS_FOLDER_PATH;
 int MAX_KEYFRAME_NUM;
-
+double PIX_SIGMA, FX, FY, CX, CY; 
 template <typename T>
 T readParam(ros::NodeHandle &n, std::string name)
 {
@@ -76,6 +76,16 @@ void readParameters(ros::NodeHandle &n)
     GYR_N = fsSettings["gyr_n"];
     GYR_W = fsSettings["gyr_w"];
     G.z() = fsSettings["g_norm"];
+
+    PIX_SIGMA = fsSettings["F_threshold"];
+    ROS_DEBUG("SOLVER_TIME: %lf PIX_SIGMA = %lf ACC_N = %lf ACC_W = %lf GYR_N = %lf GYR_W = %lf G.z = %lf", SOLVER_TIME, PIX_SIGMA, ACC_N, ACC_W, GYR_N, GYR_W, G.z());
+
+    cv::FileNode node = fsSettings["projection_parameters"];
+    FX = static_cast<double>(node["fx"]);
+    FY = static_cast<double>(node["fy"]);
+    CX = static_cast<double>(node["cx"]);
+    CY = static_cast<double>(node["cy"]);
+    ROS_DEBUG("FX = %f FY = %f CX = %f CY = %f", FX, FY, CX, CY);
 
     ESTIMATE_EXTRINSIC = fsSettings["estimate_extrinsic"];
     if (ESTIMATE_EXTRINSIC == 2)

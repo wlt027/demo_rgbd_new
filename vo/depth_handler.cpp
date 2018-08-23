@@ -57,10 +57,10 @@ mCloudPub(new pcl::PointCloud<pcl::PointXYZI>())
 	mCloudStamp[i] = 0; 
 	mCloudArray[i].reset(new pcl::PointCloud<pcl::PointXYZI>()); 
     }
-    mk[0] = 525.; // 617.31; // fx
-    mk[1] = 525.; // 617.71; // fy
-    mk[2] = 319.5; // 326.24; // cx
-    mk[3] = 239.5; // 239.97; // cy
+    mk[0] = 617.31; // 525.; // 617.31; // fx
+    mk[1] = 617.71; // 525.; // 617.71; // fy
+    mk[2] = 326.24; // 319.5; // 326.24; // cx
+    mk[3] = 239.97; // 239.5; // 239.97; // cy
 }
 
 // template<int CLOUD_NUM>
@@ -87,7 +87,7 @@ void DepthHandler::cloudHandler2(const sensor_msgs::Image::ConstPtr& dpt_img_msg
    // const float* syncCloud2Pointer = reinterpret_cast<const float*>(&dpt_img_msg->data[0]);
     float scale = 0.001; 
     float min_dis = 0.3; 
-    float max_dis = 3;  // keep depth range 
+    float max_dis = 3.;  // keep depth range 
     for(double i = halfDS; i < dpt_img.rows; i += mCloudDSRate)
 	for(double j = halfDS; j < dpt_img.cols; j += mCloudDSRate)
 	{

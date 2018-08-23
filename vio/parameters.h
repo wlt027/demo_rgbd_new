@@ -39,11 +39,15 @@ extern std::string VINS_FOLDER_PATH;
 extern int LOOP_CLOSURE;
 extern int MIN_LOOP_NUM;
 extern int MAX_KEYFRAME_NUM;
+extern int IMAGE_ROW;
+extern int IMAGE_COL;
+extern double CX, CY, FX, FY;
 extern std::string PATTERN_FILE;
 extern std::string VOC_FILE;
 extern std::string CAM_NAMES;
 extern std::string IMAGE_TOPIC;
 extern std::string IMU_TOPIC;
+extern double PIX_SIGMA; 
 
 void readParameters(ros::NodeHandle &n);
 

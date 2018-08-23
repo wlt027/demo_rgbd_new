@@ -79,6 +79,7 @@ void VIO::processIMU(double dt, Vector3d & linear_acceleration, Vector3d& angula
     }
     if(frame_count != 0)
     {
+    // cout<<"vio.cpp: processIMU dt = "<<dt<<" linear_acceleration: "<<linear_acceleration.transpose()<<" angular_velocity: "<<angular_velocity.transpose()<<endl;
 	pre_integrations[frame_count]->push_back(dt, linear_acceleration, angular_velocity); 
 
 	// tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity); 
@@ -112,6 +113,7 @@ void VIO::setParameter()
     }
     Eigen::Quaterniond q(ric[0]); 
     mTIC = tf::Transform(tf::Quaternion(q.x(), q.y(), q.z(), q.w()), tf::Vector3(tic[0][0], tic[0][1], tic[0][2])); 
+    printTF(mTIC, "vio.cpp: initial mTIC: ");
     // f_manager.setRic(ric);
 }
 
@@ -165,8 +167,20 @@ void VIO::processImage(sensor_msgs::PointCloud2ConstPtr& imagePoints2)
 	// associate features 
 	associateFeatures(vip); 
 
+    // reject by fundamental matrix
+    rejectByF(vip); 
+
+    // remove close triangulated point
+    removeWrongTri(vip); 
+
 	// solve odometry 
 	solveOdometry(vip); 
+
+    // remove outliers
+    removeOutliers(vip);
+
+    // solve it angin 
+    solveOdometry(vip); 
 
 	// slide for next loop 
 	slideWindow(); 
@@ -179,6 +193,128 @@ void VIO::processImage(sensor_msgs::PointCloud2ConstPtr& imagePoints2)
     prepareForDisplay(vip);
 
     return ; 
+}
+
+void VIO::removeWrongTri(vector<ip_M>& ipRelations)
+{
+    vector<ip_M>& tmp = ipRelations; 
+    for(int i=0; i<tmp.size(); i++)
+    {
+        ip_M& m = tmp[i];
+        if(m.v == ip_M::DEPTH_TRI)
+        {
+            if(m.s < 3.1)
+                m.v = ip_M::INVALID;
+        }
+    }
+}
+
+void VIO::rejectByF(vector<ip_M>& ipRelations)
+{
+    TicToc t_f; 
+    vector<ip_M>& tmp = ipRelations; 
+    if(tmp.size() == 0) return; 
+    vector<cv::Point2f> pre_pts(tmp.size()); 
+    vector<cv::Point2f> cur_pts(tmp.size()); 
+    for(int i=0; i<tmp.size();i++)
+    {
+        ip_M& m = tmp[i];
+        pre_pts[i] = cv::Point2f(m.ui * FOCAL_LENGTH + CX, m.vi * FOCAL_LENGTH + CY); 
+        cur_pts[i] = cv::Point2f(m.uj * FOCAL_LENGTH + CX, m.vj * FOCAL_LENGTH + CY); 
+    }
+    vector<uchar> status; 
+    int cnt_invalid = 0;
+    cv::findFundamentalMat(pre_pts, cur_pts, cv::FM_RANSAC, PIX_SIGMA, 0.99, status);
+    for(int i=0; i<tmp.size(); i++)
+    {
+        if(!status[i])
+        {
+            ++cnt_invalid;
+            tmp[i].v = ip_M::INVALID;
+        }
+    }
+    ROS_DEBUG("rejectF cost %lf remove %d outlier out of %d matches ratio: %f", t_f.toc(), cnt_invalid, tmp.size(), 1.*cnt_invalid/tmp.size());
+}
+
+void VIO::removeOutliers(vector<ip_M>& ipRelations)
+{
+    vector<ip_M>& tmp = ipRelations; 
+
+    double lambda = 1./PIX_SIGMA;
+    Eigen::Matrix2d Info_M = lambda * lambda * Eigen::Matrix2d::Identity();
+    tf::Transform Tji = mCurrPose.inverse() * mLastPose;
+    tf::Transform Tij = Tji.inverse(); 
+    tf::Quaternion qji = Tji.getRotation();
+    tf::Vector3 tij = Tij.getOrigin(); 
+    Eigen::Matrix3d R = Eigen::Quaterniond(qji.getW(), qji.getX(), qji.getY(), qji.getZ()).toRotationMatrix(); 
+    Eigen::Vector3d t(tij.getX(), tij.getY(), tij.getZ()); 
+
+    int cnt_outlier = 0;
+    int cnt_depth = 0;
+    int cnt_no_depth = 0; 
+    int cnt_outlier_no_d = 0;
+    for(int i=0; i<tmp.size(); i++)
+    {
+        ip_M& m = tmp[i]; 
+        if(m.v == ip_M::DEPTH_MES || m.v == ip_M::DEPTH_TRI)
+        {
+            ++cnt_depth;
+
+            tf::Vector3 pi(m.ui*m.s, m.vi*m.s, m.s); 
+            tf::Vector3 pj = Tji*pi; 
+            if(pj.getZ() <= 0.3) 
+            {
+                m.v = ip_M::INVALID; 
+                ++cnt_outlier;
+                continue;
+            }
+
+            if(m.v == ip_M::DEPTH_TRI)
+            {
+                if(pj.getZ() <= 3.1)
+                {
+                    m.v = ip_M::INVALID;
+                    ++cnt_outlier;
+                    continue; 
+                }                
+            }
+
+            Eigen::Vector2d pix_j(m.uj * FOCAL_LENGTH + CX, m.vj * FOCAL_LENGTH + CY); 
+            Eigen::Vector2d pix_j_pro(pj.getX()/pj.getZ(), pj.getY()/pj.getZ());
+            pix_j_pro(0) = pix_j_pro(0) * FOCAL_LENGTH + CX; 
+            pix_j_pro(1) = pix_j_pro(1) * FOCAL_LENGTH + CY; 
+            Eigen::Vector2d diff_pix = pix_j - pix_j_pro;
+            double chi2 = diff_pix.transpose() * Info_M * diff_pix;
+            if(chi2 > 5.991)
+            {
+                m.v = ip_M::INVALID;
+                ++cnt_outlier;
+            }
+        }else if(m.v == ip_M::NO_DEPTH)
+        {
+            ++cnt_no_depth;
+            // Essential matrix test
+            // Eigen::Matrix3d E = R * Utility::skewSymmetric(t); 
+            // Eigen::Vector3d xj(m.uj, m.vj, 1.);
+            // Eigen::Vector3d xi(m.ui, m.vi, 1.); 
+
+            // double err_dis = xj.transpose()*E*xi; 
+            // // cout <<"err_dis: "<<err_dis<<endl;
+            // if(err_dis > PIX_SIGMA)
+            // {
+            //     m.v = ip_M::INVALID;
+            //     ++cnt_outlier_no_d;
+            // }
+
+            // Fundamental matrix check 
+
+        }
+
+    }
+
+    // ipRelations.swap(tmp);
+    ROS_DEBUG("vio.cpp: total %d features, depth %d outlier %d outlier ratio = %f", tmp.size(), cnt_depth, cnt_outlier, cnt_outlier/(float)cnt_depth);
+    ROS_DEBUG("vio.cpp: no_depth %d , outlier %d outlier ratio = %f", cnt_no_depth, cnt_outlier_no_d, cnt_outlier_no_d/(float)cnt_no_depth);
 }
 
 void VIO::prepareForDisplay(vector<ip_M>& ipRelations)
@@ -242,7 +378,8 @@ void VIO::solveOdometry(vector<ip_M>& vip)
 	ceres::LocalParameterization *local_param = new PoseLocalPrameterization; 
 	problem.AddParameterBlock(para_Ex_Pose[0], 7, local_param); 
 	// if not optimize [ric, tic]
-	problem.SetParameterBlockConstant(para_Ex_Pose[0]); 
+    if(ESTIMATE_EXTRINSIC == 0)
+	   problem.SetParameterBlockConstant(para_Ex_Pose[0]); 
     }
 
     priorOptimize(vip); 
@@ -254,6 +391,9 @@ void VIO::solveOdometry(vector<ip_M>& vip)
 	if (pre_integrations[j]->sum_dt > 10.0)
 	    continue;
 	IMUFactor* imu_factor = new IMUFactor(pre_integrations[j]);
+    // cout<<"IMU factor noise: "<<endl<<imu_factor->pre_integration->noise<<endl;
+    // cout<<"IMU factor jacobian: "<<endl<<imu_factor->pre_integration->jacobian<<endl;
+    // cout<<"IMU factor covariance: "<<endl<<imu_factor->pre_integration->covariance<<endl;
 	problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
     }
 
@@ -454,7 +594,7 @@ void VIO::initialize()
     cout <<" after transform fv = "<<tg.transpose()<<endl; 
     cout <<" initialization bg: "<<Bgs[0].transpose()<<endl; 
     mCurrPose = mCurrIMUPose * mTIC; 
-    mInitCamPose = mCurrPose; 
+    mInitCamPose = mLastPose = mCurrPose; 
     cout <<"vio.cpp: after initialization mCurrIMUPose: "<<Ps[0].transpose()<<" "<<q.x()<<" "<<q.y()<<" "<<q.z()<<" "<<q.w()<<endl; 
     printTF(mTIC, string("vio.cpp: after initialization mTIC: ")); 
     printTF(mCurrPose, string("vio.cpp: after initialization mCurrPose: ")); 

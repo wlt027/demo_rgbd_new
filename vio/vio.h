@@ -61,6 +61,11 @@ public:
     void setPointCloudAt(double); 
     void prepareForDisplay(vector<ip_M>& ipRelations);
 
+    // remove outliers
+    void removeOutliers(vector<ip_M>& ipRelations);
+    void removeWrongTri(vector<ip_M>& ipRelations);
+    void rejectByF(vector<ip_M>& ipRelations);
+
     volatile bool mbInited;  
 
     double mTimeLast; // current timestamp 
