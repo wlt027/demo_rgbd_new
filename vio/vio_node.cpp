@@ -30,10 +30,14 @@ std::mutex m_buf;
 std::mutex m_dpt_buf;
 
 ros::Publisher *voDataPubPointer = NULL;
-tf::TransformBroadcaster *tfBroadcasterPointer = NULL;
+
 ros::Publisher *depthPointsPubPointer = NULL;
 ros::Publisher *imagePointsProjPubPointer = NULL;
 ros::Publisher *imageShowPubPointer;
+
+tf::TransformBroadcaster * tfBroadcasterPointer = NULL; // camera_init to camera
+tf::TransformBroadcaster * tfBroadcastTWI; // world to imu
+tf::TransformBroadcaster * tfBroadcastTWC_init; // world to camera_init
 
 std::condition_variable con;
 std::condition_variable con_dpt; 
@@ -124,8 +128,18 @@ int main(int argc, char **argv)
 
     // registerPub(n);
 
+    
     tf::TransformBroadcaster tfBroadcaster;
     tfBroadcasterPointer = &tfBroadcaster;
+    
+    
+    tf::TransformBroadcaster tfBroadcaster1;
+    tfBroadcastTWI = &tfBroadcaster1;
+    
+    
+    tf::TransformBroadcaster tfBroadcaster2;
+    tfBroadcastTWC_init = &tfBroadcaster2;
+    
 
     ros::Subscriber sub_imu = nh.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
     // ros::Subscriber sub_image = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
@@ -212,7 +226,7 @@ void process()
         voData.header.stamp = img_msg->header.stamp;
         voData.child_frame_id = "/camera";
      
-	tf::Transform vo_to_init = vio.mInitCamPose.inverse() * vio.mCurrPose;  
+	    tf::Transform vo_to_init = vio.mInitCamPose.inverse() * vio.mCurrPose;  
         tf::Quaternion q = vo_to_init.getRotation(); 
         tf::Vector3 t = vo_to_init.getOrigin(); 
         voData.pose.pose.orientation.x = q.getX(); 
@@ -228,17 +242,37 @@ void process()
 
         cout <<"vio publish: vio t "<<t.getX()<<" "<<t.getY() <<" "<<t.getZ()<<endl;
         cout <<"vio publish: vio q "<< q.getX()<<" "<< q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl;
-        
-        // broadcast voTrans 
-        tf::StampedTransform voTrans;
-        voTrans.frame_id_ = "/camera_init";
-        voTrans.child_frame_id_ = "/camera";
-        voTrans.stamp_ = img_msg->header.stamp;
-        voTrans.setRotation(q); 
-        voTrans.setOrigin(t); 
-        tfBroadcasterPointer->sendTransform(voTrans); 
-        
-        // TODO: handle msg depth point
+        {
+            // broadcast voTrans camera_init -> camera
+            tf::StampedTransform voTrans;
+            voTrans.frame_id_ = "/camera_init";
+            voTrans.child_frame_id_ = "/camera";
+            voTrans.stamp_ = img_msg->header.stamp;
+            voTrans.setRotation(q); 
+            voTrans.setOrigin(t); 
+            tfBroadcasterPointer->sendTransform(voTrans); 
+        }
+
+        {
+            // broadcast voTrans imu -> camera 
+            tf::StampedTransform voTrans;
+            voTrans.frame_id_ = "/world";
+            voTrans.child_frame_id_ = "/camera_init";
+            voTrans.stamp_ = img_msg->header.stamp;
+            voTrans.setData(vio.mInitCamPose);
+            tfBroadcastTWC_init->sendTransform(voTrans); 
+        }
+
+
+        {
+            // broadcast voTrans imu -> camera 
+            tf::StampedTransform voTrans;
+            voTrans.frame_id_ = "/world";
+            voTrans.child_frame_id_ = "/imu";
+            voTrans.stamp_ = img_msg->header.stamp;
+            voTrans.setData(vio.mCurrIMUPose);
+            tfBroadcastTWI->sendTransform(voTrans); 
+        }
 
         // deal with image
         sensor_msgs::PointCloud2 imagePointsProj2;
