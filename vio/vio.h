@@ -88,6 +88,7 @@ public:
     boost::shared_ptr<pcl::PointCloud<ImagePoint> > mFtObsCurr; // record the measurement 
     boost::shared_ptr<pcl::PointCloud<ImagePoint> > mFtObsLast; // record the measurement 
     
+    tf::Transform mInitCamPose; // Initial campose 
     tf::Transform mLastPose; // camera pose for the mImgPTLast 
     tf::Transform mCurrPose; // camera pose for the mImgPTCurr 
     tf::Transform mCurrIMUPose; // current IMU pose  

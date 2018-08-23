@@ -11,10 +11,21 @@
 #include "../utility/utility.h"
 #include "opencv/cv.h"
 #include <iostream>
+#include <string>
 #include "../utility/tic_toc.h"
 #include "projection_quat.h"
 
 using namespace QUATERNION_VIO; 
+
+namespace{
+
+    void printTF(tf::Transform& T, string name="")
+    {
+	tf::Quaternion q = T.getRotation(); 
+	tf::Vector3 t = T.getOrigin(); 
+	cout <<name<<" "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<" "<<q.getX()<<" "<<q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl; 
+    }
+}
 
 VIO::VIO():
 mTimeLast(0),
@@ -413,6 +424,8 @@ void VIO::initialize()
     gy /= (float)(N); 
     gz /= (float)(N); 
     
+    double len = sqrt(ax*ax + ay*ay + az*az); 
+    ax /= len; ay /= len; az /= len; 
     // compute rotation for the first pose 
     Eigen::Vector3d fv(ax, ay, az); 
     Eigen::Vector3d tv(0, 0, 1);  // vn100's gz points to upwards
@@ -423,19 +436,29 @@ void VIO::initialize()
     Eigen::Vector4d vq; 
     vq.head<3>() = w * sin(half_angle); 
     vq[3] = cos(half_angle); 
+
+    // cout <<"w = "<<w.transpose()<<" angle = "<<angle<<" vq = "<<vq.transpose()<<endl; 
     Eigen::Quaterniond q(vq); 
     Eigen::Matrix<double, 3, 3> m = q.toRotationMatrix(); 
     
     Eigen::Vector3d Z(0,0,0);
-    Rs[0] = m; 
-    Ps[0] = Z;  
-    Vs[0] = Z;
-    Bas[0] = Z; 
-    Bgs[0] = Eigen::Vector3d(gx, gy, gz); 
+    Rs[1] = Rs[0] = m; 
+    Ps[1] = Ps[0] = Z;  
+    Vs[1] = Vs[0] = Z;
+    Bas[1] = Bas[0] = Z; 
+    Bgs[1] = Bgs[0] = Eigen::Vector3d(gx, gy, gz); 
     mCurrIMUPose = tf::Transform(tf::Quaternion(q.x(), q.y(), q.z(), q.w()), tf::Vector3(0,0,0)); 
     
+    Eigen::Vector3d tg = m * fv; 
+    cout <<"q = "<<q.x()<<" "<<q.y()<<" "<<q.z()<<" "<<q.w()<<endl;
+    cout <<" after transform fv = "<<tg.transpose()<<endl; 
+    cout <<" initialization bg: "<<Bgs[0].transpose()<<endl; 
     mCurrPose = mCurrIMUPose * mTIC; 
-
+    mInitCamPose = mCurrPose; 
+    cout <<"vio.cpp: after initialization mCurrIMUPose: "<<Ps[0].transpose()<<" "<<q.x()<<" "<<q.y()<<" "<<q.z()<<" "<<q.w()<<endl; 
+    printTF(mTIC, string("vio.cpp: after initialization mTIC: ")); 
+    printTF(mCurrPose, string("vio.cpp: after initialization mCurrPose: ")); 
+    
     mbInited = true; 
     return ; 
 }
@@ -540,6 +563,11 @@ void VIO::associateFeatures(vector<ip_M>& vip)
     setPointCloudAt(mTimeLast); 
 
     int j = 0;
+    int cnt_matched = 0; 
+    int cnt_no_depth = 0; 
+    int cnt_depth_mes = 0; 
+    int cnt_depth_tri = 0; 
+    int cnt_not_matched = 0; 
     for(int i=0; i<imgPTLastNum; i++)
     {
 	bool ipFound = false; 
@@ -556,6 +584,7 @@ void VIO::associateFeatures(vector<ip_M>& vip)
 
 	if(ipFound)
 	{
+	    ++cnt_matched; 
 	    // normalized point 
 	    ipr.ui = mImgPTLast->points[i].u; 
 	    ipr.vi = mImgPTLast->points[i].v; 
@@ -669,11 +698,27 @@ void VIO::associateFeatures(vector<ip_M>& vip)
 		    ipr.v = ip_M::DEPTH_TRI;
 		}
 	    }
+	    if(ipr.v == ip_M::NO_DEPTH)
+	     { ++cnt_no_depth;
+		// ROS_DEBUG("at match num = %d ++cnt_no_depth = %d ", cnt_matched, cnt_no_depth); 
+	     }
+	    else if(ipr.v == ip_M::DEPTH_MES)
+	    {
+		++cnt_depth_mes;
+		// ROS_DEBUG("at match num = %d ++cnt_depth_mes = %d ", cnt_matched, cnt_depth_mes); 
+	    }
+	    else if(ipr.v == ip_M::DEPTH_TRI)
+	    {
+		++cnt_depth_tri; 
+		// ROS_DEBUG("at match num = %d ++cnt_depth_tri = %d ", cnt_matched, cnt_depth_tri); 
+	    }
 	    ipr.ind = mImgPTLast->points[i].ind; 
 	    ipRelations.push_back(ipr); 
-	}
+	}else
+	    ++cnt_not_matched; 
     }
     vip = ipRelations; 
+    ROS_DEBUG("vio.cpp: total %d no matches %d matches %d, no_depth: %d depth_with_meas: %d depth_with_tri: %d",imgPTLastNum, cnt_not_matched, cnt_matched, cnt_no_depth, cnt_depth_mes, cnt_depth_tri);
 }
 
 

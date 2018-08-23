@@ -27,9 +27,9 @@ void CTrackerParam::defaultInit()
     mXBoundary = 20; 
     mYBoundary = 20;
     
-    mShowSkipNum = 0; // 2; // 2; 
+    mShowSkipNum = 2; // 2; // 2; 
     mShowDSRate = 2; 
-    mbShowTrackedResult = true; // whether to show feature track result 
+    mbShowTrackedResult = false; // true; // whether to show feature track result 
 
     mMaxTrackDis = 100; 
     mTrackWinSize = 15; 
