@@ -30,6 +30,7 @@ std::mutex m_buf;
 std::mutex m_dpt_buf;
 
 ros::Publisher *voDataPubPointer = NULL;
+ros::Publisher *vioDataPubPointer = NULL;
 
 ros::Publisher *depthPointsPubPointer = NULL;
 ros::Publisher *imagePointsProjPubPointer = NULL;
@@ -156,6 +157,9 @@ int main(int argc, char **argv)
     
     ros::Publisher voDataPub = nh.advertise<nav_msgs::Odometry> ("/cam_to_init", 5);
     voDataPubPointer = &voDataPub;
+    
+    ros::Publisher vioDataPub = nh.advertise<nav_msgs::Odometry>("/imu_to_world", 5); 
+    vioDataPubPointer = &vioDataPub; 
 
     ros::Subscriber imageDataSub = nh.subscribe<sensor_msgs::Image>("/image/show", 1, imageDataHandler);
 
@@ -226,9 +230,9 @@ void process()
         voData.header.stamp = img_msg->header.stamp;
         voData.child_frame_id = "/camera";
      
-	    tf::Transform vo_to_init = vio.mInitCamPose.inverse() * vio.mCurrPose;  
-        tf::Quaternion q = vo_to_init.getRotation(); 
-        tf::Vector3 t = vo_to_init.getOrigin(); 
+	tf::Transform vo_to_init = vio.mInitCamPose.inverse() * vio.mCurrPose;  
+	tf::Quaternion q = vo_to_init.getRotation(); 
+	tf::Vector3 t = vo_to_init.getOrigin(); 
         voData.pose.pose.orientation.x = q.getX(); 
         voData.pose.pose.orientation.y = q.getY(); 
         voData.pose.pose.orientation.z = q.getZ(); 
@@ -240,8 +244,6 @@ void process()
         
         // cout<<"vo node at "<<std::fixed<<voData.header.stamp.toSec()<<" vo result: "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl;
 
-        cout <<"vio publish: vio t "<<t.getX()<<" "<<t.getY() <<" "<<t.getZ()<<endl;
-        cout <<"vio publish: vio q "<< q.getX()<<" "<< q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl;
         {
             // broadcast voTrans camera_init -> camera
             tf::StampedTransform voTrans;
@@ -252,6 +254,25 @@ void process()
             voTrans.setOrigin(t); 
             tfBroadcasterPointer->sendTransform(voTrans); 
         }
+	
+	// publish vio result 
+	q = vio.mCurrIMUPose.getRotation(); 
+	t = vio.mCurrIMUPose.getOrigin(); 
+	nav_msgs::Odometry vioData; 
+        vioData.header.frame_id = "/world"; 
+        vioData.header.stamp = img_msg->header.stamp;
+        vioData.child_frame_id = "/imu";
+ 
+	vioData.pose.pose.orientation.x = q.getX(); 
+	vioData.pose.pose.orientation.y = q.getY(); 
+	vioData.pose.pose.orientation.z = q.getZ(); 
+	vioData.pose.pose.orientation.w = q.getW();
+	vioData.pose.pose.position.x = t.getX(); 
+        vioData.pose.pose.position.y = t.getY();
+        vioData.pose.pose.position.z = t.getZ(); 
+        vioDataPubPointer->publish(vioData);
+        cout <<"vio publish: vio t "<<t.getX()<<" "<<t.getY() <<" "<<t.getZ()<<endl;
+        cout <<"vio publish: vio q "<< q.getX()<<" "<< q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl;
 
         {
             // broadcast voTrans imu -> camera 

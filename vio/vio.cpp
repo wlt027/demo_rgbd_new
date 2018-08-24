@@ -167,25 +167,25 @@ void VIO::processImage(sensor_msgs::PointCloud2ConstPtr& imagePoints2)
 	// associate features 
 	associateFeatures(vip); 
 
-    // reject by fundamental matrix
-    rejectByF(vip); 
+	// reject by fundamental matrix
+	rejectByF(vip); 
 
-    // remove close triangulated point
-    removeWrongTri(vip); 
+	// remove close triangulated point
+	removeWrongTri(vip); 
 
 	// solve odometry 
 	solveOdometry(vip); 
 
-    // remove outliers
-    removeOutliers(vip);
+	// remove outliers
+	removeOutliers(vip);
 
-    // solve it angin 
-    solveOdometry(vip); 
+	// solve it angin 
+	solveOdometry(vip); 
 
 	// slide for next loop 
 	slideWindow(); 
     }
-    
+
     // for next loop
     prepareNextLoop(); 
 
