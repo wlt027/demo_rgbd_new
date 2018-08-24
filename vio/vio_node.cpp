@@ -207,16 +207,16 @@ void process()
                  });
         lk.unlock();
 
-	   for (auto &measurement : measurements)
-        {
-            for (auto &imu_msg : measurement.first)
-                send_imu(imu_msg);
+	for (auto &measurement : measurements)
+	{
+	    for (auto &imu_msg : measurement.first)
+		send_imu(imu_msg);
 
-	      auto img_msg = measurement.second;
-            ROS_DEBUG("processing vision data with stamp %f \n", img_msg->header.stamp.toSec());
+	    auto img_msg = measurement.second;
+	    ROS_DEBUG("processing vision data with stamp %f \n", img_msg->header.stamp.toSec());
 
-            TicToc t_s;
-            // estimator.processImage(image, img_msg->header);
+	    TicToc t_s;
+	    // estimator.processImage(image, img_msg->header);
 	    vio.processImage(img_msg); 
 	    double whole_t = t_s.toc();
 	    ROS_DEBUG("vio_node.cpp: vo cost %f ms", whole_t); 
@@ -224,122 +224,129 @@ void process()
 	    ROS_DEBUG("vio_node.cpp: average vo cost %f ms", sum_vo_t/(++sum_vo_cnt));
 
 
-        // publish msg voData 
-        nav_msgs::Odometry voData; 
-        voData.header.frame_id = "/camera_init"; 
-        voData.header.stamp = img_msg->header.stamp;
-        voData.child_frame_id = "/camera";
-     
-	tf::Transform vo_to_init = vio.mInitCamPose.inverse() * vio.mCurrPose;  
-	tf::Quaternion q = vo_to_init.getRotation(); 
-	tf::Vector3 t = vo_to_init.getOrigin(); 
-        voData.pose.pose.orientation.x = q.getX(); 
-        voData.pose.pose.orientation.y = q.getY(); 
-        voData.pose.pose.orientation.z = q.getZ(); 
-        voData.pose.pose.orientation.w = q.getW(); 
-        voData.pose.pose.position.x = t.getX(); 
-        voData.pose.pose.position.y = t.getY();
-        voData.pose.pose.position.z = t.getZ(); 
-        voDataPubPointer->publish(voData);
-        
-        // cout<<"vo node at "<<std::fixed<<voData.header.stamp.toSec()<<" vo result: "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl;
+	    // publish msg voData 
+	    nav_msgs::Odometry voData; 
+	    voData.header.frame_id = "/camera_init"; 
+	    voData.header.stamp = img_msg->header.stamp;
+	    voData.child_frame_id = "/camera";
 
-        {
-            // broadcast voTrans camera_init -> camera
-            tf::StampedTransform voTrans;
-            voTrans.frame_id_ = "/camera_init";
-            voTrans.child_frame_id_ = "/camera";
-            voTrans.stamp_ = img_msg->header.stamp;
-            voTrans.setRotation(q); 
-            voTrans.setOrigin(t); 
-            tfBroadcasterPointer->sendTransform(voTrans); 
-        }
-	
-	// publish vio result 
-	q = vio.mCurrIMUPose.getRotation(); 
-	t = vio.mCurrIMUPose.getOrigin(); 
-	nav_msgs::Odometry vioData; 
-        vioData.header.frame_id = "/world"; 
-        vioData.header.stamp = img_msg->header.stamp;
-        vioData.child_frame_id = "/imu";
- 
-	vioData.pose.pose.orientation.x = q.getX(); 
-	vioData.pose.pose.orientation.y = q.getY(); 
-	vioData.pose.pose.orientation.z = q.getZ(); 
-	vioData.pose.pose.orientation.w = q.getW();
-	vioData.pose.pose.position.x = t.getX(); 
-        vioData.pose.pose.position.y = t.getY();
-        vioData.pose.pose.position.z = t.getZ(); 
-        vioDataPubPointer->publish(vioData);
-        cout <<"vio publish: vio t "<<t.getX()<<" "<<t.getY() <<" "<<t.getZ()<<endl;
-        cout <<"vio publish: vio q "<< q.getX()<<" "<< q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl;
+	    tf::Transform vo_to_init = vio.mInitCamPose.inverse() * vio.mCurrPose;  
+	    tf::Quaternion q = vo_to_init.getRotation(); 
+	    tf::Vector3 t = vo_to_init.getOrigin(); 
+	    voData.pose.pose.orientation.x = q.getX(); 
+	    voData.pose.pose.orientation.y = q.getY(); 
+	    voData.pose.pose.orientation.z = q.getZ(); 
+	    voData.pose.pose.orientation.w = q.getW(); 
+	    voData.pose.pose.position.x = t.getX(); 
+	    voData.pose.pose.position.y = t.getY();
+	    voData.pose.pose.position.z = t.getZ(); 
+	    voDataPubPointer->publish(voData);
 
-        {
-            // broadcast voTrans imu -> camera 
-            tf::StampedTransform voTrans;
-            voTrans.frame_id_ = "/world";
-            voTrans.child_frame_id_ = "/camera_init";
-            voTrans.stamp_ = img_msg->header.stamp;
-            voTrans.setData(vio.mInitCamPose);
-            tfBroadcastTWC_init->sendTransform(voTrans); 
-        }
+	    // cout<<"vo node at "<<std::fixed<<voData.header.stamp.toSec()<<" vo result: "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl;
+
+	    {
+		// broadcast voTrans camera_init -> camera
+		tf::StampedTransform voTrans;
+		voTrans.frame_id_ = "/camera_init";
+		voTrans.child_frame_id_ = "/camera";
+		voTrans.stamp_ = img_msg->header.stamp;
+		voTrans.setRotation(q); 
+		voTrans.setOrigin(t); 
+		tfBroadcasterPointer->sendTransform(voTrans); 
+	    }
+
+	    // publish vio result 
+	    q = vio.mCurrIMUPose.getRotation(); 
+	    t = vio.mCurrIMUPose.getOrigin(); 
+	    nav_msgs::Odometry vioData; 
+	    vioData.header.frame_id = "/world"; 
+	    vioData.header.stamp = img_msg->header.stamp;
+	    vioData.child_frame_id = "/imu";
+
+	    vioData.pose.pose.orientation.x = q.getX(); 
+	    vioData.pose.pose.orientation.y = q.getY(); 
+	    vioData.pose.pose.orientation.z = q.getZ(); 
+	    vioData.pose.pose.orientation.w = q.getW();
+	    vioData.pose.pose.position.x = t.getX(); 
+	    vioData.pose.pose.position.y = t.getY();
+	    vioData.pose.pose.position.z = t.getZ(); 
+	    vioDataPubPointer->publish(vioData);
+	    cout <<"vio publish: vio t "<<t.getX()<<" "<<t.getY() <<" "<<t.getZ()<<endl;
+	    cout <<"vio publish: vio q "<< q.getX()<<" "<< q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl;
+
+	    {
+		// broadcast voTrans imu -> camera 
+		tf::StampedTransform voTrans;
+		voTrans.frame_id_ = "/world";
+		voTrans.child_frame_id_ = "/camera_init";
+		voTrans.stamp_ = img_msg->header.stamp;
+		voTrans.setData(vio.mInitCamPose);
+		tfBroadcastTWC_init->sendTransform(voTrans); 
+	    }
 
 
-        {
-            // broadcast voTrans imu -> camera 
-            tf::StampedTransform voTrans;
-            voTrans.frame_id_ = "/world";
-            voTrans.child_frame_id_ = "/imu";
-            voTrans.stamp_ = img_msg->header.stamp;
-            voTrans.setData(vio.mCurrIMUPose);
-            tfBroadcastTWI->sendTransform(voTrans); 
-        }
+	    {
+		// broadcast voTrans imu -> camera 
+		tf::StampedTransform voTrans;
+		voTrans.frame_id_ = "/world";
+		voTrans.child_frame_id_ = "/imu";
+		voTrans.stamp_ = img_msg->header.stamp;
+		voTrans.setData(vio.mCurrIMUPose);
+		tfBroadcastTWI->sendTransform(voTrans); 
+	    }
 
-        // deal with image
-        sensor_msgs::PointCloud2 imagePointsProj2;
-        pcl::toROSMsg(*(vio.mImagePointsProj), imagePointsProj2);
-        imagePointsProj2.header.frame_id = "camera";
-        imagePointsProj2.header.stamp = ros::Time().fromSec(vio.mTimeLast);
-        imagePointsProjPubPointer->publish(imagePointsProj2);    
+	    // deal with image
+	    sensor_msgs::PointCloud2 imagePointsProj2;
 
+	    pcl::toROSMsg(*(vio.mPCNoFloor), imagePointsProj2);
+	    imagePointsProj2.header.frame_id = "camera";
+	    imagePointsProj2.header.stamp = ros::Time().fromSec(vio.mTimeLast);
+	    imagePointsProjPubPointer->publish(imagePointsProj2);    
+	    cout <<"publish PCNoFloor with "<<vio.mPCNoFloor->points.size()<<" points!"<<endl;
+
+	    //	    pcl::toROSMsg(*(vio.mImagePointsProj), imagePointsProj2);
+//	    imagePointsProj2.header.frame_id = "camera";
+//	    imagePointsProj2.header.stamp = ros::Time().fromSec(vio.mTimeLast);
+//	    imagePointsProjPubPointer->publish(imagePointsProj2);    
+//
 	}
     }
 }
 
 
-std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloud2ConstPtr>>
+    std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloud2ConstPtr>>
 getMeasurements()
 {
     std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloud2ConstPtr>> measurements;
 
     while (true)
     {
-        if (imu_buf.empty() || feature_buf.empty())
-            return measurements;
+	if (imu_buf.empty() || feature_buf.empty())
+	    return measurements;
 
-        if ((imu_buf.back()->header.stamp < feature_buf.front()->header.stamp))
-        {
-            ROS_WARN("wait for imu, only should happen at the beginning");
-            return measurements;
-        }
+	if ((imu_buf.back()->header.stamp < feature_buf.front()->header.stamp))
+	{
+	    ROS_WARN("wait for imu, only should happen at the beginning");
+	    return measurements;
+	}
 
-        if ((imu_buf.front()->header.stamp > feature_buf.front()->header.stamp))
-        {
-            ROS_WARN("throw img, only should happen at the beginning");
-            feature_buf.pop();
-            continue;
-        }
-        sensor_msgs::PointCloud2ConstPtr img_msg = feature_buf.front();
-        feature_buf.pop();
+	if ((imu_buf.front()->header.stamp > feature_buf.front()->header.stamp))
+	{
+	    ROS_WARN("throw img, only should happen at the beginning");
+	    feature_buf.pop();
+	    continue;
+	}
+	sensor_msgs::PointCloud2ConstPtr img_msg = feature_buf.front();
+	feature_buf.pop();
 
-        std::vector<sensor_msgs::ImuConstPtr> IMUs;
-        while (imu_buf.front()->header.stamp <= img_msg->header.stamp)
-        {
-            IMUs.emplace_back(imu_buf.front());
-            imu_buf.pop();
-        }
+	std::vector<sensor_msgs::ImuConstPtr> IMUs;
+	while (imu_buf.front()->header.stamp <= img_msg->header.stamp)
+	{
+	    IMUs.emplace_back(imu_buf.front());
+	    imu_buf.pop();
+	}
 
-        measurements.emplace_back(IMUs, img_msg);
+	measurements.emplace_back(IMUs, img_msg);
     }
     return measurements;
 }
@@ -359,21 +366,21 @@ void imageDataHandler(const sensor_msgs::Image::ConstPtr& imageData)
     // cout<<"vo_node display image at "<<std::fixed<<imageData->header.stamp.toSec()<<endl;
     for (int i = 0; i < ipRelationsNum; i++) 
     {
-    ip_M pt = ipRelations[i];
-    if ( pt.v == ip_M::NO_DEPTH) 
-    {   
-        // cout<<"No depth: pt.uj = "<<(kImage[2] - pt.uj * kImage[0])<<" pt.vj: "<<(kImage[5] - pt.vj * kImage[4]) <<" pt.s = "<<pt.s<<endl;
-        cv::circle(show_img, cv::Point((kImage[2] + pt.uj * kImage[0]) / showDSRate, (kImage[5] + pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(255, 0, 0), 2);
-    } else if (pt.v == ip_M::DEPTH_MES) {
-        // cout<<"Depth MES: pt.uj = "<<(kImage[2] - pt.uj * kImage[0])<<" pt.vj: "<<(kImage[5] - pt.vj * kImage[4]) <<" pt.s = "<<pt.s<<endl;
-        cv::circle(show_img, cv::Point((kImage[2] + pt.uj * kImage[0]) / showDSRate,(kImage[5] + pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(0, 255, 0), 2);
-    } else if (pt.v == ip_M::DEPTH_TRI) {
-        // cout<<"Depth TRI: pt.uj = "<<(kImage[2] - pt.uj * kImage[0])<<" pt.vj: "<<(kImage[5] - pt.vj * kImage[4]) <<" pt.s = "<<pt.s<<endl;
-        cv::circle(show_img, cv::Point((kImage[2] + pt.uj * kImage[0]) / showDSRate,(kImage[5] + pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(0, 0, 255), 2);
-    } /*else {
-        cv::circle(bridge->image, cv::Point((kImage[2] - ipRelations->points[i].z * kImage[0]) / showDSRate,
-        (kImage[5] - ipRelations->points[i].h * kImage[4]) / showDSRate), 1, CV_RGB(0, 0, 0), 2);
-        }*/
+	ip_M pt = ipRelations[i];
+	if ( pt.v == ip_M::NO_DEPTH) 
+	{   
+	    // cout<<"No depth: pt.uj = "<<(kImage[2] - pt.uj * kImage[0])<<" pt.vj: "<<(kImage[5] - pt.vj * kImage[4]) <<" pt.s = "<<pt.s<<endl;
+	    cv::circle(show_img, cv::Point((kImage[2] + pt.uj * kImage[0]) / showDSRate, (kImage[5] + pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(255, 0, 0), 2);
+	} else if (pt.v == ip_M::DEPTH_MES) {
+	    // cout<<"Depth MES: pt.uj = "<<(kImage[2] - pt.uj * kImage[0])<<" pt.vj: "<<(kImage[5] - pt.vj * kImage[4]) <<" pt.s = "<<pt.s<<endl;
+	    cv::circle(show_img, cv::Point((kImage[2] + pt.uj * kImage[0]) / showDSRate,(kImage[5] + pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(0, 255, 0), 2);
+	} else if (pt.v == ip_M::DEPTH_TRI) {
+	    // cout<<"Depth TRI: pt.uj = "<<(kImage[2] - pt.uj * kImage[0])<<" pt.vj: "<<(kImage[5] - pt.vj * kImage[4]) <<" pt.s = "<<pt.s<<endl;
+	    cv::circle(show_img, cv::Point((kImage[2] + pt.uj * kImage[0]) / showDSRate,(kImage[5] + pt.vj * kImage[4]) / showDSRate), 1, CV_RGB(0, 0, 255), 2);
+	} /*else {
+	    cv::circle(bridge->image, cv::Point((kImage[2] - ipRelations->points[i].z * kImage[0]) / showDSRate,
+	    (kImage[5] - ipRelations->points[i].h * kImage[4]) / showDSRate), 1, CV_RGB(0, 0, 0), 2);
+	    }*/
     }
     ptr->image = show_img; 
     sensor_msgs::Image::Ptr imagePointer = ptr->toImageMsg();

@@ -66,6 +66,11 @@ public:
     void removeWrongTri(vector<ip_M>& ipRelations);
     void rejectByF(vector<ip_M>& ipRelations);
 
+    // remove floor points 
+    void removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in, boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& out);
+    double mFloorZ; 
+    double mFloorRange; 
+
     volatile bool mbInited;  
 
     double mTimeLast; // current timestamp 
@@ -103,6 +108,7 @@ public:
 
     // to display the 3d point cloud of the features 
     boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> > mImagePointsProj;
+    boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> > mPCNoFloor;
     vector<ip_M> mPtRelations;    
 
     Eigen::Vector3d mg;

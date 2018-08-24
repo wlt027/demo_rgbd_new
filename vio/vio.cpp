@@ -40,9 +40,12 @@ mdisThresholdForTriangulation(1.), // 1.
 mFtObsCurr(new pcl::PointCloud<ImagePoint>),
 mFtObsLast(new pcl::PointCloud<ImagePoint>),
 mImagePointsProj(new pcl::PointCloud<pcl::PointXYZ>),
+mPCNoFloor(new pcl::PointCloud<pcl::PointXYZ>),
 mbFirstIMU(true),
 mbInited(false),
-frame_count(0)
+frame_count(0),
+mFloorZ(-10000),
+mFloorRange(0.05)
 {
     clearState();
 }
@@ -323,15 +326,30 @@ void VIO::prepareForDisplay(vector<ip_M>& ipRelations)
     mImagePointsProj->points.clear(); 
     for(int i=0; i<ipRelations.size(); i++)
     {
-    ip_M ipr = ipRelations[i]; 
-    if(ipr.v == ip_M::DEPTH_MES || ipr.v == ip_M::DEPTH_TRI)
-    {
-        pcl::PointXYZ pt; 
-        pt.x = ipr.ui * ipr.s; 
-        pt.y = ipr.vi * ipr.s; 
-        pt.z = ipr.s; 
-        mImagePointsProj->points.push_back(pt); 
+	ip_M ipr = ipRelations[i]; 
+	if(ipr.v == ip_M::DEPTH_MES || ipr.v == ip_M::DEPTH_TRI)
+	{
+	    pcl::PointXYZ pt; 
+	    pt.x = ipr.ui * ipr.s; 
+	    pt.y = ipr.vi * ipr.s; 
+	    pt.z = ipr.s; 
+	    mImagePointsProj->points.push_back(pt); 
+	}
     }
+    {
+	// transform to world coordinate 
+	pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
+	tmp->points.resize(mPC->points.size()); 
+	for(int i=0; i<mPC->points.size(); i++)
+	{
+	    pcl::PointXYZI& pt = mPC->points[i]; 
+	    tf::Vector3 pj(pt.x/mZoomDis*pt.intensity, pt.y/mZoomDis*pt.intensity, pt.intensity); 
+	    tf::Vector3 pi = mLastPose * pj; 
+	    pcl::PointXYZ ptw(pi.getX(), pi.getY(), pi.getZ());
+	    tmp->points[i] = ptw; 
+	}
+	// remove floor 
+	removeFloorPts(tmp, mPCNoFloor); 
     }
 
     // save this for displaying 
@@ -862,3 +880,100 @@ void VIO::associateFeatures(vector<ip_M>& vip)
 }
 
 
+void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in, boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& out)
+{
+    TicToc t_fz; 
+    if(in->points.size() < 100)
+	return ; 
+
+    if(mFloorZ == -10000) //     
+    {	
+	// double max_z = 0.1; 
+	// double min_z = -1.5; 
+
+	double min_z = 1e10; 
+	double max_z = -1e10; 
+
+	for(int i=0; i<in->points.size(); i++)
+	{
+	    double pz = in->points[i].z; 
+	    if(min_z > pz ) min_z = pz; 
+	    if(max_z < pz ) max_z = pz; 
+	}
+
+	cout <<"pcd_filter.cpp : min_z: "<<min_z<<" max_z: "<<max_z<<endl; 
+
+	//  histogram into different bins 
+	double res = 0.1; 
+	if(max_z - min_z > 2.0) max_z = min_z + 2.0; 
+	int n_bins = (max_z - min_z)/res + 1; 
+
+	cout <<"n_bins: "<<n_bins<<endl;
+	map<int, vector<int> > bins; 
+	for(int i=0; i<in->points.size(); i++)
+	{
+	    double pz = in->points[i].z; 
+	    int ind = (pz - min_z + res/2.)/res;
+	    bins[ind].push_back(i); 
+	}
+
+	// find the bin with most points 
+	int max_n = 0; 
+	int max_id = -1; 
+	map<int, vector<int> >::iterator it = bins.begin();
+	while(it != bins.end())
+	{
+	    // cout <<"bin: "<<it->first<<" has: "<<it->second.size()<<endl;
+	    if(it->second.size() > max_n) 
+	    {
+		max_n = it->second.size(); 
+		max_id = it->first; 
+	    }
+	    ++it; 
+	}
+	mFloorZ = min_z + max_id*res; 
+	cout <<"max_id: "<<max_id<<" floor_z: "<<mFloorZ<<" max_n: "<<max_n<<endl; 
+	// 4. filter out points in range [min_z, z_floor + flight_height(0.2) ] 
+	out->points.clear(); 
+	out->points.reserve(in->points.size()); 
+	for(int i=0; i<in->points.size(); i++)
+	{
+	    double pz = in->points[i].z; 
+	    if(pz > mFloorZ + mFloorRange)
+	    {
+		out->points.push_back(in->points[i]); 
+	    }
+	}
+	out->width = out->points.size(); 
+	out->height = 1; 
+	out->is_dense = true; 
+	cout <<"out pc has "<<out->width<<" points!"<<endl;
+    }else
+    {
+    	out->points.clear(); 
+	out->points.reserve(in->points.size()); 
+	
+	double sum_floor_z = 0; 
+	int cnt_floor_z = 0; 
+	for(int i=0; i<in->points.size(); i++)
+	{
+	    double pz = in->points[i].z; 
+	    if(pz > mFloorZ + mFloorRange && out->points.size() < 200)
+	    {
+		out->points.push_back(in->points[i]); 
+	    }else if(pz > mFloorZ - mFloorRange)
+	    {
+		sum_floor_z += pz; 
+		++cnt_floor_z; 
+	    }
+	}
+
+	if(cnt_floor_z > 200)
+	{
+	    ROS_DEBUG("floor_z update from %f to %f ", mFloorZ, sum_floor_z/cnt_floor_z );
+	    mFloorZ = 0.9*mFloorZ + 0.1*sum_floor_z/cnt_floor_z;
+	}
+    }
+    cout <<"vio.cpp: outpc has "<<out->points.size()<<" points floor_z = "<<mFloorZ<<endl;
+    ROS_DEBUG("vio: remove floor cost %f ms", t_fz.toc()); 
+}
