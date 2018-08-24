@@ -34,6 +34,7 @@ ros::Publisher *vioDataPubPointer = NULL;
 
 ros::Publisher *depthPointsPubPointer = NULL;
 ros::Publisher *imagePointsProjPubPointer = NULL;
+ros::Publisher *obstaclePCPubPointer = NULL;
 ros::Publisher *imageShowPubPointer;
 
 tf::TransformBroadcaster * tfBroadcasterPointer = NULL; // camera_init to camera
@@ -128,7 +129,6 @@ int main(int argc, char **argv)
     ROS_WARN("waiting for image and imu...");
 
     // registerPub(n);
-
     
     tf::TransformBroadcaster tfBroadcaster;
     tfBroadcasterPointer = &tfBroadcaster;
@@ -152,9 +152,12 @@ int main(int argc, char **argv)
     ros::Subscriber depthCloudSub = nh.subscribe<sensor_msgs::PointCloud2> 
                                   ("/depth_cloud", 5, depthCloudHandler);
 
-    ros::Publisher imagePointsProjPub = nh.advertise<sensor_msgs::PointCloud2> ("/image_points_proj", 1);
+    ros::Publisher imagePointsProjPub = nh.advertise<sensor_msgs::PointCloud2> ("/image_points_proj", 5);
     imagePointsProjPubPointer = &imagePointsProjPub;
     
+    ros::Publisher pointcloudPub = nh.advertise<sensor_msgs::PointCloud2>("/obstacle_point", 5);
+    obstaclePCPubPointer = &pointcloudPub;
+
     ros::Publisher voDataPub = nh.advertise<nav_msgs::Odometry> ("/cam_to_init", 5);
     voDataPubPointer = &voDataPub;
     
@@ -297,18 +300,17 @@ void process()
 
 	    // deal with image
 	    sensor_msgs::PointCloud2 imagePointsProj2;
-
 	    pcl::toROSMsg(*(vio.mPCNoFloor), imagePointsProj2);
-	    imagePointsProj2.header.frame_id = "camera";
+	    imagePointsProj2.header.frame_id = "world";
 	    imagePointsProj2.header.stamp = ros::Time().fromSec(vio.mTimeLast);
 	    imagePointsProjPubPointer->publish(imagePointsProj2);    
-	    cout <<"publish PCNoFloor with "<<vio.mPCNoFloor->points.size()<<" points!"<<endl;
+	    cout <<"publish PCNoFloor with "<<vio.mPCNoFloor->points.size()<<" points!"<<" at time "<<std::fixed<<vio.mTimeLast<<endl;
 
-	    //	    pcl::toROSMsg(*(vio.mImagePointsProj), imagePointsProj2);
-//	    imagePointsProj2.header.frame_id = "camera";
-//	    imagePointsProj2.header.stamp = ros::Time().fromSec(vio.mTimeLast);
-//	    imagePointsProjPubPointer->publish(imagePointsProj2);    
-//
+	    // pcl::toROSMsg(*(vio.mImagePointsProj), imagePointsProj2);
+	    // imagePointsProj2.header.frame_id = "camera";
+	    // imagePointsProj2.header.stamp = ros::Time().fromSec(vio.mTimeLast);
+	    // imagePointsProjPubPointer->publish(imagePointsProj2);    
+        cout <<"publish imagePointsProj2 with "<<imagePointsProj2.height * imagePointsProj2.width<<" points!"<<" at time "<<std::fixed<<vio.mTimeLast<<endl;
 	}
     }
 }

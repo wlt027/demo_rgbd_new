@@ -10,7 +10,9 @@
 #include <ros/ros.h>
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <iostream>
 #include "../vo/depth_handler.h"
+using namespace std; 
 
 ros::Publisher *depthCloudPubPointer = NULL;
 
@@ -52,6 +54,7 @@ void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData)
     depthCloud2.header.frame_id = "camera";
     depthCloud2.header.stamp = voData->header.stamp;
     depthCloudPubPointer->publish(depthCloud2);
+    // cout<<"depth_handler.cpp: publish depth cloud "<<depthCloud2.height * depthCloud2.width<<" points"<<endl;
 }
 
 

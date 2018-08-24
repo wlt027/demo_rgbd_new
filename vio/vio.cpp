@@ -45,7 +45,7 @@ mbFirstIMU(true),
 mbInited(false),
 frame_count(0),
 mFloorZ(-10000),
-mFloorRange(0.05)
+mFloorRange(0.15)
 {
     clearState();
 }
@@ -885,23 +885,29 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
     TicToc t_fz; 
     if(in->points.size() < 100)
 	return ; 
+    out->points.clear();
+
+    double min_z, max_z; 
 
     if(mFloorZ == -10000) //     
     {	
 	// double max_z = 0.1; 
 	// double min_z = -1.5; 
+	   min_z = 1e10; 
+	   max_z = -1e10; 
+        for(int i=0; i<in->points.size(); i++)
+        {
+            double pz = in->points[i].z; 
+            if(min_z > pz ) min_z = pz; 
+            if(max_z < pz ) max_z = pz; 
+        }
+    }
+    else{
+        min_z = mFloorZ - 3*mFloorRange; 
+        max_z = mFloorZ + 3*mFloorRange; 
+    }
 
-	double min_z = 1e10; 
-	double max_z = -1e10; 
-
-	for(int i=0; i<in->points.size(); i++)
-	{
-	    double pz = in->points[i].z; 
-	    if(min_z > pz ) min_z = pz; 
-	    if(max_z < pz ) max_z = pz; 
-	}
-
-	cout <<"pcd_filter.cpp : min_z: "<<min_z<<" max_z: "<<max_z<<endl; 
+	cout <<"removeFloorPts.cpp : min_z: "<<min_z<<" max_z: "<<max_z<<endl; 
 
 	//  histogram into different bins 
 	double res = 0.1; 
@@ -926,12 +932,17 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
 	    // cout <<"bin: "<<it->first<<" has: "<<it->second.size()<<endl;
 	    if(it->second.size() > max_n) 
 	    {
-		max_n = it->second.size(); 
-		max_id = it->first; 
+		  max_n = it->second.size(); 
+		  max_id = it->first; 
 	    }
 	    ++it; 
 	}
-	mFloorZ = min_z + max_id*res; 
+    if(mFloorZ == -10000)
+	   mFloorZ = min_z + max_id*res; 
+    else {
+        if(max_n > 100)
+            mFloorZ = 0.5 * mFloorZ + 0.5 *(min_z + max_id*res);
+    }
 	cout <<"max_id: "<<max_id<<" floor_z: "<<mFloorZ<<" max_n: "<<max_n<<endl; 
 	// 4. filter out points in range [min_z, z_floor + flight_height(0.2) ] 
 	out->points.clear(); 
@@ -941,39 +952,13 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
 	    double pz = in->points[i].z; 
 	    if(pz > mFloorZ + mFloorRange)
 	    {
-		out->points.push_back(in->points[i]); 
+		  out->points.push_back(in->points[i]); 
 	    }
 	}
-	out->width = out->points.size(); 
-	out->height = 1; 
-	out->is_dense = true; 
-	cout <<"out pc has "<<out->width<<" points!"<<endl;
-    }else
-    {
-    	out->points.clear(); 
-	out->points.reserve(in->points.size()); 
-	
-	double sum_floor_z = 0; 
-	int cnt_floor_z = 0; 
-	for(int i=0; i<in->points.size(); i++)
-	{
-	    double pz = in->points[i].z; 
-	    if(pz > mFloorZ + mFloorRange && out->points.size() < 200)
-	    {
-		out->points.push_back(in->points[i]); 
-	    }else if(pz > mFloorZ - mFloorRange)
-	    {
-		sum_floor_z += pz; 
-		++cnt_floor_z; 
-	    }
-	}
-
-	if(cnt_floor_z > 200)
-	{
-	    ROS_DEBUG("floor_z update from %f to %f ", mFloorZ, sum_floor_z/cnt_floor_z );
-	    mFloorZ = 0.9*mFloorZ + 0.1*sum_floor_z/cnt_floor_z;
-	}
-    }
+  
+    out->width = out->points.size(); 
+    out->height = 1; 
+    out->is_dense = true; 
     cout <<"vio.cpp: outpc has "<<out->points.size()<<" points floor_z = "<<mFloorZ<<endl;
     ROS_DEBUG("vio: remove floor cost %f ms", t_fz.toc()); 
 }
