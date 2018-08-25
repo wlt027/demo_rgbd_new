@@ -15,6 +15,7 @@
 using namespace std; 
 
 ros::Publisher *depthCloudPubPointer = NULL;
+ros::Publisher *currDepthCloudPubPointer = NULL;
 
 DepthHandler* pDptHandler = new DepthHandler(); 
 
@@ -33,6 +34,9 @@ int main(int argc, char** argv)
   ros::Publisher depthCloudPub = nh.advertise<sensor_msgs::PointCloud2> ("/depth_cloud", 5);
   depthCloudPubPointer = &depthCloudPub;
 
+  ros::Publisher cur_depthCloudPub = nh.advertise<sensor_msgs::PointCloud2> ("/current_depth_cloud", 5);
+  currDepthCloudPubPointer = &cur_depthCloudPub;
+
   ros::spin();
 
   return 0;
@@ -41,7 +45,14 @@ int main(int argc, char** argv)
 
 void syncCloudHandler(const sensor_msgs::Image::ConstPtr& syncCloud2)
 {
-   return pDptHandler->cloudHandler2(syncCloud2); 
+    pDptHandler->cloudHandler2(syncCloud2); 
+    sensor_msgs::PointCloud2 depthCloud2; 
+    pcl::toROSMsg(*(pDptHandler->mCloudArray[pDptHandler->mSyncCloudId]), depthCloud2);
+    depthCloud2.header.frame_id = "camera"; 
+    depthCloud2.header.stamp = syncCloud2->header.stamp; 
+    currDepthCloudPubPointer->publish(depthCloud2);
+
+    return; 
 }
 
 void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData)
@@ -55,6 +66,7 @@ void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData)
     depthCloud2.header.stamp = voData->header.stamp;
     depthCloudPubPointer->publish(depthCloud2);
     // cout<<"depth_handler.cpp: publish depth cloud "<<depthCloud2.height * depthCloud2.width<<" points"<<endl;
+    return ; 
 }
 
 

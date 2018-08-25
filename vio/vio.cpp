@@ -14,6 +14,7 @@
 #include <string>
 #include "../utility/tic_toc.h"
 #include "projection_quat.h"
+#include "plane.h"
 
 using namespace QUATERNION_VIO; 
 
@@ -41,6 +42,7 @@ mFtObsCurr(new pcl::PointCloud<ImagePoint>),
 mFtObsLast(new pcl::PointCloud<ImagePoint>),
 mImagePointsProj(new pcl::PointCloud<pcl::PointXYZ>),
 mPCNoFloor(new pcl::PointCloud<pcl::PointXYZ>),
+mPCFloor(new pcl::PointCloud<pcl::PointXYZ>),
 mbFirstIMU(true),
 mbInited(false),
 frame_count(0),
@@ -118,6 +120,19 @@ void VIO::setParameter()
     mTIC = tf::Transform(tf::Quaternion(q.x(), q.y(), q.z(), q.w()), tf::Vector3(tic[0][0], tic[0][1], tic[0][2])); 
     printTF(mTIC, "vio.cpp: initial mTIC: ");
     // f_manager.setRic(ric);
+}
+
+void VIO::processCurrDepthCloud(sensor_msgs::PointCloud2ConstPtr& depthCloud2)
+{
+    double pctime = depthCloud2->header.stamp.toSec(); 
+
+    // mPC->clear(); 
+    pcl::PointCloud<pcl::PointXYZI>::Ptr tmpPC(new pcl::PointCloud<pcl::PointXYZI>); 
+    pcl::fromROSMsg(*depthCloud2, *tmpPC); 
+    m_curr_pc_buf.lock(); 
+    curr_pc_time_buf.push(pctime);
+    curr_pc_buf.push(tmpPC);
+    m_curr_pc_buf.unlock();
 }
 
 void VIO::processDepthCloud(sensor_msgs::PointCloud2ConstPtr& depthCloud2)
@@ -943,18 +958,69 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
         if(max_n > 100)
             mFloorZ = 0.5 * mFloorZ + 0.5 *(min_z + max_id*res);
     }
+
 	cout <<"max_id: "<<max_id<<" floor_z: "<<mFloorZ<<" max_n: "<<max_n<<endl; 
-	// 4. filter out points in range [min_z, z_floor + flight_height(0.2) ] 
-	out->points.clear(); 
-	out->points.reserve(in->points.size()); 
-	for(int i=0; i<in->points.size(); i++)
-	{
-	    double pz = in->points[i].z; 
-	    if(pz > mFloorZ + mFloorRange)
-	    {
-		  out->points.push_back(in->points[i]); 
-	    }
-	}
+
+    // find floor plane 
+    mPCFloor->clear(); 
+    out->points.clear(); 
+    pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>());
+    tmp->points.reserve(in->points.size()/2); 
+    for(int i=0; i<in->points.size(); i++)
+    {
+        double pz = in->points[i].z; 
+        if(pz < mFloorZ + mFloorRange && pz > mFloorZ - mFloorRange)
+        {
+          tmp->points.push_back(in->points[i]); 
+        }
+    }
+    Eigen::Vector3d nv; 
+    double nd; 
+    pcl::PointIndices::Ptr indices(new pcl::PointIndices); 
+    ((Plane*)(0))->computeByPCL<pcl::PointXYZ>(tmp, indices, nv, nd); 
+    Eigen::Vector3d g(0, 0, 1); 
+    double angle = nv.dot(g); 
+    const double COS30 = cos(30.*M_PI/180.);
+    cout<<"Floor plane has indices.size = "<<indices->indices.size()<<" points nv = "<<nv.transpose()<<endl;
+    if(indices->indices.size() < 200 || angle < COS30) // NO Floor plane is observed 
+    {
+        out->points.reserve(in->points.size()); 
+        for(int i=0; i<in->points.size(); i++)
+        {
+            double pz = in->points[i].z; 
+            if(pz > mFloorZ + 3*mFloorRange)
+            {
+              out->points.push_back(in->points[i]); 
+            }
+        }
+        cout<<"failed to take it as a plane ! "<<endl;
+    }else // succeed to get a floor plane 
+    { 
+        // save floor points for display 
+        mPCFloor->points.reserve(indices->indices.size()); 
+        double sum_z = 0; 
+        for(int i=0; i<indices->indices.size(); i++)
+        {
+            mPCFloor->points.push_back(tmp->points[indices->indices[i]]); 
+            sum_z += tmp->points[indices->indices[i]].z; 
+        }
+        mFloorZ = sum_z/(indices->indices.size()); 
+        cout <<"succeed to find out floor plane, reset floor_Z = "<<mFloorZ<<endl;
+
+        mPCFloor->width = mPCFloor->points.size(); 
+        mPCFloor->height = 1;
+        mPCFloor->is_dense = true;
+        // find the obstacle point 
+        for(int i=0; i<in->points.size(); i++)
+        {
+            Eigen::Vector3d pt(in->points[i].x, in->points[i].y, in->points[i].z);
+            double dis = nv.dot(pt) + nd; 
+            if(dis > 2*mFloorRange)
+            {
+                out->points.push_back(in->points[i]);
+            }
+        }
+    }
   
     out->width = out->points.size(); 
     out->height = 1; 

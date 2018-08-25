@@ -35,7 +35,8 @@ ros::Publisher *vioDataPubPointer = NULL;
 ros::Publisher *depthPointsPubPointer = NULL;
 ros::Publisher *imagePointsProjPubPointer = NULL;
 ros::Publisher *obstaclePCPubPointer = NULL;
-ros::Publisher *imageShowPubPointer;
+ros::Publisher *imageShowPubPointer = NULL;
+ros::Publisher *floorPCPubPointer = NULL; 
 
 tf::TransformBroadcaster * tfBroadcasterPointer = NULL; // camera_init to camera
 tf::TransformBroadcaster * tfBroadcastTWI; // world to imu
@@ -89,6 +90,12 @@ void depthCloudHandler(const sensor_msgs::PointCloud2ConstPtr& depthCloud2)
     // cout <<"receive dpt msg at "<<std::fixed<<depthCloud2->header.stamp.toSec()<<endl; 
 }
 
+void currDepthCloudHandler(const sensor_msgs::PointCloud2ConstPtr& depthCloud2)
+{
+    cout<<"vio_node.cpp: succeed to get depthcloud at current stamp: "<<std::fixed<<depthCloud2->header.stamp.toSec()<<endl;
+    // vio.processCurrDepthCloud(depthCloud2);
+}
+
 void send_imu(const sensor_msgs::ImuConstPtr &imu_msg)
 {
     double t = imu_msg->header.stamp.toSec();
@@ -116,6 +123,8 @@ getMeasurements();
 void process(); 
 void process_depthcloud();
 void imageDataHandler(const sensor_msgs::Image::ConstPtr& imageData);
+void depthDataHandler(const sensor_msgs::Image::ConstPtr& depthData); 
+void publishMsg(sensor_msgs::PointCloud2ConstPtr& img_msg);
 
 int main(int argc, char **argv)
 {
@@ -150,13 +159,19 @@ int main(int argc, char **argv)
                                    ("/image_points_last", 5, imagePointsHandler);
 
     ros::Subscriber depthCloudSub = nh.subscribe<sensor_msgs::PointCloud2> 
-                                  ("/depth_cloud", 5, depthCloudHandler);
+                                  ("/depth_cloud", 5, depthCloudHandler); // transformed depth cloud for the last stamp 
+
+    ros::Subscriber currDepthCloudSub = nh.subscribe<sensor_msgs::PointCloud2>
+                                  ("/current_depth_cloud", 5, currDepthCloudHandler); // observed depth cloud for the curr stamp
 
     ros::Publisher imagePointsProjPub = nh.advertise<sensor_msgs::PointCloud2> ("/image_points_proj", 5);
     imagePointsProjPubPointer = &imagePointsProjPub;
     
     ros::Publisher pointcloudPub = nh.advertise<sensor_msgs::PointCloud2>("/obstacle_point", 5);
     obstaclePCPubPointer = &pointcloudPub;
+
+    ros::Publisher floorPCPub = nh.advertise<sensor_msgs::PointCloud2>("/floor_point", 5);
+    floorPCPubPointer = &floorPCPub;
 
     ros::Publisher voDataPub = nh.advertise<nav_msgs::Odometry> ("/cam_to_init", 5);
     voDataPubPointer = &voDataPub;
@@ -198,6 +213,7 @@ void process_depthcloud()
     }
 }
 
+
 void process()
 {
     while (ros::ok())
@@ -226,94 +242,115 @@ void process()
 	    sum_vo_t += whole_t; 
 	    ROS_DEBUG("vio_node.cpp: average vo cost %f ms", sum_vo_t/(++sum_vo_cnt));
 
-
-	    // publish msg voData 
-	    nav_msgs::Odometry voData; 
-	    voData.header.frame_id = "/camera_init"; 
-	    voData.header.stamp = img_msg->header.stamp;
-	    voData.child_frame_id = "/camera";
-
-	    tf::Transform vo_to_init = vio.mInitCamPose.inverse() * vio.mCurrPose;  
-	    tf::Quaternion q = vo_to_init.getRotation(); 
-	    tf::Vector3 t = vo_to_init.getOrigin(); 
-	    voData.pose.pose.orientation.x = q.getX(); 
-	    voData.pose.pose.orientation.y = q.getY(); 
-	    voData.pose.pose.orientation.z = q.getZ(); 
-	    voData.pose.pose.orientation.w = q.getW(); 
-	    voData.pose.pose.position.x = t.getX(); 
-	    voData.pose.pose.position.y = t.getY();
-	    voData.pose.pose.position.z = t.getZ(); 
-	    voDataPubPointer->publish(voData);
-
-	    // cout<<"vo node at "<<std::fixed<<voData.header.stamp.toSec()<<" vo result: "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl;
-
-	    {
-		// broadcast voTrans camera_init -> camera
-		tf::StampedTransform voTrans;
-		voTrans.frame_id_ = "/camera_init";
-		voTrans.child_frame_id_ = "/camera";
-		voTrans.stamp_ = img_msg->header.stamp;
-		voTrans.setRotation(q); 
-		voTrans.setOrigin(t); 
-		tfBroadcasterPointer->sendTransform(voTrans); 
-	    }
-
-	    // publish vio result 
-	    q = vio.mCurrIMUPose.getRotation(); 
-	    t = vio.mCurrIMUPose.getOrigin(); 
-	    nav_msgs::Odometry vioData; 
-	    vioData.header.frame_id = "/world"; 
-	    vioData.header.stamp = img_msg->header.stamp;
-	    vioData.child_frame_id = "/imu";
-
-	    vioData.pose.pose.orientation.x = q.getX(); 
-	    vioData.pose.pose.orientation.y = q.getY(); 
-	    vioData.pose.pose.orientation.z = q.getZ(); 
-	    vioData.pose.pose.orientation.w = q.getW();
-	    vioData.pose.pose.position.x = t.getX(); 
-	    vioData.pose.pose.position.y = t.getY();
-	    vioData.pose.pose.position.z = t.getZ(); 
-	    vioDataPubPointer->publish(vioData);
-	    cout <<"vio publish: vio t "<<t.getX()<<" "<<t.getY() <<" "<<t.getZ()<<endl;
-	    cout <<"vio publish: vio q "<< q.getX()<<" "<< q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl;
-
-	    {
-		// broadcast voTrans imu -> camera 
-		tf::StampedTransform voTrans;
-		voTrans.frame_id_ = "/world";
-		voTrans.child_frame_id_ = "/camera_init";
-		voTrans.stamp_ = img_msg->header.stamp;
-		voTrans.setData(vio.mInitCamPose);
-		tfBroadcastTWC_init->sendTransform(voTrans); 
-	    }
-
-
-	    {
-		// broadcast voTrans imu -> camera 
-		tf::StampedTransform voTrans;
-		voTrans.frame_id_ = "/world";
-		voTrans.child_frame_id_ = "/imu";
-		voTrans.stamp_ = img_msg->header.stamp;
-		voTrans.setData(vio.mCurrIMUPose);
-		tfBroadcastTWI->sendTransform(voTrans); 
-	    }
-
-	    // deal with image
-	    sensor_msgs::PointCloud2 imagePointsProj2;
-	    pcl::toROSMsg(*(vio.mPCNoFloor), imagePointsProj2);
-	    imagePointsProj2.header.frame_id = "world";
-	    imagePointsProj2.header.stamp = ros::Time().fromSec(vio.mTimeLast);
-	    imagePointsProjPubPointer->publish(imagePointsProj2);    
-	    cout <<"publish PCNoFloor with "<<vio.mPCNoFloor->points.size()<<" points!"<<" at time "<<std::fixed<<vio.mTimeLast<<endl;
-
-	    // pcl::toROSMsg(*(vio.mImagePointsProj), imagePointsProj2);
-	    // imagePointsProj2.header.frame_id = "camera";
-	    // imagePointsProj2.header.stamp = ros::Time().fromSec(vio.mTimeLast);
-	    // imagePointsProjPubPointer->publish(imagePointsProj2);    
-        cout <<"publish imagePointsProj2 with "<<imagePointsProj2.height * imagePointsProj2.width<<" points!"<<" at time "<<std::fixed<<vio.mTimeLast<<endl;
+        publishMsg(img_msg); 
 	}
     }
 }
+
+
+void publishMsg(sensor_msgs::PointCloud2ConstPtr& img_msg)
+{
+      // publish msg voData 
+        nav_msgs::Odometry voData; 
+        voData.header.frame_id = "/camera_init"; 
+        voData.header.stamp = img_msg->header.stamp;
+        voData.child_frame_id = "/camera";
+
+        tf::Transform vo_to_init = vio.mInitCamPose.inverse() * vio.mCurrPose;  
+        tf::Quaternion q = vo_to_init.getRotation(); 
+        tf::Vector3 t = vo_to_init.getOrigin(); 
+        voData.pose.pose.orientation.x = q.getX(); 
+        voData.pose.pose.orientation.y = q.getY(); 
+        voData.pose.pose.orientation.z = q.getZ(); 
+        voData.pose.pose.orientation.w = q.getW(); 
+        voData.pose.pose.position.x = t.getX(); 
+        voData.pose.pose.position.y = t.getY();
+        voData.pose.pose.position.z = t.getZ(); 
+        voDataPubPointer->publish(voData);
+
+        // cout<<"vo node at "<<std::fixed<<voData.header.stamp.toSec()<<" vo result: "<<t.getX()<<" "<<t.getY()<<" "<<t.getZ()<<endl;
+
+        {
+        // broadcast voTrans camera_init -> camera
+        tf::StampedTransform voTrans;
+        voTrans.frame_id_ = "/camera_init";
+        voTrans.child_frame_id_ = "/camera";
+        voTrans.stamp_ = img_msg->header.stamp;
+        voTrans.setRotation(q); 
+        voTrans.setOrigin(t); 
+        tfBroadcasterPointer->sendTransform(voTrans); 
+        }
+
+        // publish vio result 
+        q = vio.mCurrIMUPose.getRotation(); 
+        t = vio.mCurrIMUPose.getOrigin(); 
+        nav_msgs::Odometry vioData; 
+        vioData.header.frame_id = "/world"; 
+        vioData.header.stamp = img_msg->header.stamp;
+        vioData.child_frame_id = "/imu";
+
+        vioData.pose.pose.orientation.x = q.getX(); 
+        vioData.pose.pose.orientation.y = q.getY(); 
+        vioData.pose.pose.orientation.z = q.getZ(); 
+        vioData.pose.pose.orientation.w = q.getW();
+        vioData.pose.pose.position.x = t.getX(); 
+        vioData.pose.pose.position.y = t.getY();
+        vioData.pose.pose.position.z = t.getZ(); 
+        vioDataPubPointer->publish(vioData);
+        cout <<"vio publish: vio t "<<t.getX()<<" "<<t.getY() <<" "<<t.getZ()<<endl;
+        cout <<"vio publish: vio q "<< q.getX()<<" "<< q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl;
+
+        {
+        // broadcast voTrans imu -> camera 
+        tf::StampedTransform voTrans;
+        voTrans.frame_id_ = "/world";
+        voTrans.child_frame_id_ = "/camera_init";
+        voTrans.stamp_ = img_msg->header.stamp;
+        voTrans.setData(vio.mInitCamPose);
+        tfBroadcastTWC_init->sendTransform(voTrans); 
+        }
+
+
+        {
+        // broadcast voTrans imu -> camera 
+        tf::StampedTransform voTrans;
+        voTrans.frame_id_ = "/world";
+        voTrans.child_frame_id_ = "/imu";
+        voTrans.stamp_ = img_msg->header.stamp;
+        voTrans.setData(vio.mCurrIMUPose);
+        tfBroadcastTWI->sendTransform(voTrans); 
+        }
+
+        // deal with image
+        {  
+            // publish points with depth 
+            sensor_msgs::PointCloud2 imagePointsProj2;
+            pcl::toROSMsg(*(vio.mImagePointsProj), imagePointsProj2);
+            imagePointsProj2.header.frame_id = "camera";
+            imagePointsProj2.header.stamp = ros::Time().fromSec(vio.mTimeLast);
+            imagePointsProjPubPointer->publish(imagePointsProj2);    
+        }
+        {
+            // publish obstacle point 
+            sensor_msgs::PointCloud2 obstaclePC2;
+            pcl::toROSMsg(*(vio.mPCNoFloor), obstaclePC2);
+            obstaclePC2.header.frame_id = "world";
+            obstaclePC2.header.stamp = ros::Time().fromSec(vio.mTimeLast);
+            obstaclePCPubPointer->publish(obstaclePC2);    
+        }
+
+        {
+            // publish floor point 
+            sensor_msgs::PointCloud2 floorPC2; 
+            pcl::toROSMsg(*(vio.mPCFloor), floorPC2); 
+            floorPC2.header.frame_id = "world"; 
+            floorPC2.header.stamp = ros::Time().fromSec(vio.mTimeLast); 
+            floorPCPubPointer->publish(floorPC2);
+        }
+        // cout <<"publish imagePointsProj2 with "<<imagePointsProj2.height * imagePointsProj2.width<<" points!"<<" at time "<<std::fixed<<vio.mTimeLast<<endl;
+
+}
+
 
 
     std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloud2ConstPtr>>
