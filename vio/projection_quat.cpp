@@ -12,6 +12,213 @@ using namespace std;
 
 namespace QUATERNION_VIO{
 
+
+Unit3::Unit3(Eigen::Vector3d& n): p_(n.normalized()),
+B_(NULL),
+H_B_(NULL)
+{}
+
+Unit3::~Unit3()
+{
+    if(B_) 
+    {
+        delete B_; 
+        B_ = NULL; 
+    }
+    if(H_B_)
+    {
+        delete H_B_;
+        H_B_ = NULL;
+    }
+}
+Eigen::Matrix<double, 3, 2> Unit3::getBasis(Matrix62* H)
+{
+    if(B_ && !H)
+        return *B_;
+    if(B_ && H && H_B_)
+    {
+        *H = *H_B_;
+        return *B_;
+    }
+    Eigen::Vector3d n = p_; 
+    Eigen::Vector3d axis(0, 0, 1); 
+    double mx = fabs(n(0)); double my = fabs(n(1)); double mz = fabs(n(2)); 
+    if((mx <= my) && (mx <= mz))
+    {
+        axis = Eigen::Vector3d(1.0, 0., 0.);
+    }else if((my <= mx) && (my <= mz))
+    {
+        axis = Eigen::Vector3d(0., 1.0, 0.);
+    }
+  
+    Eigen::Vector3d B1 = n.cross(axis); 
+    Eigen::Vector3d b1 = B1/B1.norm();
+    Eigen::Vector3d b2 = n.cross(b1); 
+    if(B_ == NULL)
+        B_ = new Matrix32; 
+    *(B_) << b1.x(), b2.x(), b1.y(), b2.y(), b1.z(), b2.z(); 
+
+    if(H)
+    {
+        Eigen::Matrix<double, 3 ,3> d_B1_d_n  = Utility::skewSymmetric(-axis); 
+        double bx = B1.x(); double by = B1.y(); double bz = B1.z(); 
+        double bx2 = bx*bx; double by2 = by*by; double bz2 = bz*bz; 
+        Eigen::Matrix<double, 3, 3> d_b1_d_B1; 
+        d_b1_d_B1 << by2+bz2, -bx*by, -bx*bz, -bx*by, bx2+bz2, -by*bz, -bx*bz, -by*bz, bx2+by2;
+        d_b1_d_B1 /= std::pow(bx2 + by2 + bz2, 1.5);
+        Eigen::Matrix<double, 3 ,3> d_b2_d_n, d_b2_d_b1; 
+        d_b2_d_n = Utility::skewSymmetric(-b1); 
+        d_b2_d_b1 = Utility::skewSymmetric(n); 
+
+        Matrix32& d_n_d_p = *B_; 
+        Matrix32 d_b1_d_p = d_b1_d_B1 * d_B1_d_n * d_n_d_p; 
+        Matrix32 d_b2_d_p = d_b2_d_b1 * d_b1_d_p + d_b2_d_n * d_n_d_p; 
+        if(H_B_ == NULL)
+            H_B_ = new Matrix62; 
+        (*H_B_) << d_b1_d_p, d_b2_d_p; 
+        *H = *H_B_;
+    }
+
+    return (*B_); 
+}
+
+PlaneFactor_P1::PlaneFactor_P1(const Eigen::Matrix<double,4,1>& plane_g, const Eigen::Matrix<double, 4, 1>& plane_l)
+{
+    Eigen::Vector3d nv_g_e = plane_g.block<3,1>(0,0); 
+    nv_g = Unit3(nv_g_e); 
+    Eigen::Vector3d nv_l_e = plane_l.block<3,1>(0,0); 
+    nv_l = Unit3(nv_l_e); 
+
+    d_g = plane_g(3); 
+    d_l = plane_l(3); 
+    sqrt_info = 10; 
+}
+
+bool PlaneFactor_P1::Evaluate(double const *const *parameters, double *residuals, double **jacobians) const
+{
+    Eigen::Vector3d Pi(parameters[0][0], parameters[0][1], parameters[0][2]);
+    Eigen::Quaterniond Qi(parameters[0][6], parameters[0][3], parameters[0][4], parameters[0][5]); 
+
+    // plane_l = plane_g.transform(Tgl) 
+    Eigen::Quaterniond Qi_inv = Qi.inverse(); 
+    Eigen::Vector3d nl_e = Qi_inv*nv_g.p_; 
+    nl_e /= nl_e.norm();
+    Unit3 nl(nl_e);
+    double dl = nv_g.dot(Pi) + d_g;
+   
+    Eigen::Map<Eigen::Vector3d> residual(residuals);
+    Matrix62 d_B_d_p; 
+    Eigen::Matrix<double, 3, 2> B = nv_l.getBasis(d_B_d_p); 
+    Eigen::Matrix<double, 2, 3> Bt = B.transpose();
+    residual.block<2,1>(0,0) = Bt * nl.p_; 
+    residual(2) = d_l - dl; 
+ 
+    if(jacobians)
+    {
+        Eigen::Matrix<double, 3, 6> d_nl_dTgl = Eigen::Matrix<double, 3, 6>::Zero(); 
+        d_nl_dTgl.block<2,3>(0,0) = nl.getBasis().transpose() * Utility::skewSymmetric(nl.p_);
+        d_nl_dTgl.block<1,3>(2,3) = nl.p_.transpose();   
+        // Eigen::Matrix<double, 1, 3> d_r1_d_b1 = nl.p_.transpose(); 
+        // Eigen::Matrix<double, 1, 3> d_r2_d_b2 = nl.p_.transpose();
+        // Eigen::Matrix<double, 3, 2> d_b1_d_p = d_B_d_p.block<3,2>(0,0); 
+        // Eigen::Matrix<double, 3, 2> d_b2_d_p = d_B_d_p.block<3,2>(3,0); 
+        // Eigen::Matrix<double, 1, 2> d_r1_d_p = d_r1_d_b1 * d_b1_d_p; 
+        // Eigen::Matrix<double, 1, 2> d_r2_d_p = d_r2_d_b2 * d_b2_d_p; 
+        // Eigen::Matrix<double, 2, 2> d_r_d_p; 
+        // d_r_d_p << d_r1_d_p, d_r2_d_p;
+        Eigen::Matrix<2,2> d_r_d_nl; 
+        Matrix32 d_nlp_d_nl = nl.getBasis(); 
+        Matrix32 d_r_d_nlp = Bt; 
+        d_r_d_nl = d_r_d_nlp * d_nlp_d_nl; 
+        Eigen::Matrix<2, 6> d_r_d_Tgl = d_r_d_nl * d_nl_dTgl; 
+        Eigen::Matrix<1, 6> d_r3_d_Tgl; 
+        d_r3_d_Tgl << 0, 0, 0, -nv_g(0), -nv_g(1), -nv_g(2); 
+
+        if(jacobians[0])
+        {
+            Eigen::Map<Eigen::Matrix<double, 3,7, Eigen::RowMajor> > jacobian_pose_i(jacobians[0]); 
+            // dnv_dt = 0
+            jacobian_pose_i.block<2,3>(0,0) = d_r_d_Tgl.block<2,3>(0, 3);
+
+            // dnv_dqi 
+            jacobian_pose_i.block<2,3>(0,3) = d_r_d_Tgl.block<2,3>(0,0);
+            
+            // dd_dq = 0, 
+            jacobian_pose_i.block<1,6>(2,0) = d_r3_d_Tgl; 
+            
+            jacobian_pose_i.rightCols<1>().setZero(); 
+        }
+    }
+
+    return true; 
+}
+
+bool PlaneFactor_P1::check(double ** parameters)
+{
+    double *res = new double[1]; 
+    double **jaco = new double *[1]; 
+    jaco[0] = new double[3*7]; 
+    Evaluate(parameters, res, jaco); 
+    puts("check begins"); 
+    puts("my"); 
+
+    cout <<"res: "<<res[0]<<endl; 
+    cout <<Eigen::Map<Eigen::Matrix<double, 3, 7, Eigen::RowMajor> >(jaco[0]) <<endl; 
+  
+    Eigen::Vector3d Pi(parameters[0][0], parameters[0][1], parameters[0][2]);
+    Eigen::Quaterniond Qi(parameters[0][6], parameters[0][3], parameters[0][4], parameters[0][5]); 
+
+    Eigen::Quaterniond Qi_inv = Qi.inverse(); 
+    Eigen::Vector3d nl_e = Qi_inv*nv_g.p_; 
+    nl_e /= nl_e.length();
+    Unit3 nl(nl_e);
+    double dl = nv_g.dot(Pi) + d_g;
+   
+    Eigen::Vector3d y2;
+    Matrix62 d_B_d_p; 
+    Eigen::Matrix<double, 3, 2> B = nv_l.getBasis(d_B_d_p); 
+    Eigen::Matrix<double, 2, 3> Bt = B.transpose();
+    y2.block<2,1>(0,0) = Bt * nl.p_; 
+    y2(2) = d_l - dl; 
+
+    puts("num"); 
+    cout << "res: "<<y2.transpose()<<endl; 
+    
+    const double eps = 1e-6;
+    Eigen::Matrix<double, 3, 6> num_jacobians;
+    for(int k=0; k<6;k++)
+    {
+        Eigen::Vector3d Pi(parameters[0][0], parameters[0][1], parameters[0][2]);
+        Eigen::Quaterniond Qi(parameters[0][6], parameters[0][3], parameters[0][4], parameters[0][5]); 
+
+        int a = k / 3 ; int b = k % 3; 
+        Eigen::Vector3d delta = Eigen::Vector3d(b == 0, b == 1, b==2)*eps; 
+        if(a == 0)
+            Pi += delta; 
+        else if(a == 1)
+            Qi = Qi * Utility::deltaQ(delta); 
+    
+        Eigen::Vector3d tmp_y2;
+
+        Eigen::Quaterniond Qi_inv = Qi.inverse(); 
+        Eigen::Vector3d nl_e = Qi_inv*nv_g.p_; 
+        nl_e /= nl_e.length();
+        Unit3 nl(nl_e);
+        double dl = nv_g.dot(Pi) + d_g;
+       
+        Eigen::Vector3d y2;
+        Matrix62 d_B_d_p; 
+        Eigen::Matrix<double, 3, 2> B = nv_l.getBasis(d_B_d_p); 
+        Eigen::Matrix<double, 2, 3> Bt = B.transpose();
+        tmp_y2.block<2,1>(0,0) = Bt * nl.p_; 
+        tmp_y2(2) = d_l - dl; 
+        num_jacobians(k) = (tmp_y2 - y2)/eps; 
+    }
+    cout<<num_jacobians<<endl; 
+
+    return true;   
+}
+
 ProjectionFactor_Y2::ProjectionFactor_Y2(const Eigen::Vector3d &_pts_i, const Eigen::Vector3d &_pts_j): 
 pts_i(_pts_i), pts_j(_pts_j)
 {
