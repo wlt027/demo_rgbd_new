@@ -43,10 +43,12 @@ mFtObsLast(new pcl::PointCloud<ImagePoint>),
 mImagePointsProj(new pcl::PointCloud<pcl::PointXYZ>),
 mPCNoFloor(new pcl::PointCloud<pcl::PointXYZ>),
 mPCFloor(new pcl::PointCloud<pcl::PointXYZ>),
+mCurrPCFloor(new pcl::PointCloud<pcl::PointXYZ>),
 mbFirstIMU(true),
+mbFirstFloorObserved(false),
 mbInited(false),
 frame_count(0),
-mFloorZ(-10000),
+mFloorZ(NOT_INITIED),
 mFloorRange(0.15)
 {
     clearState();
@@ -122,7 +124,7 @@ void VIO::setParameter()
     // f_manager.setRic(ric);
 }
 
-void VIO::processCurrDepthCloud(sensor_msgs::PointCloud2ConstPtr& depthCloud2)
+void VIO::processCurrDepthCloud(const sensor_msgs::PointCloud2ConstPtr& depthCloud2)
 {
     double pctime = depthCloud2->header.stamp.toSec(); 
 
@@ -130,7 +132,7 @@ void VIO::processCurrDepthCloud(sensor_msgs::PointCloud2ConstPtr& depthCloud2)
     pcl::PointCloud<pcl::PointXYZI>::Ptr tmpPC(new pcl::PointCloud<pcl::PointXYZI>); 
     pcl::fromROSMsg(*depthCloud2, *tmpPC); 
     m_curr_pc_buf.lock(); 
-    curr_pc_time_buf.push(pctime);
+    curr_pctime_buf.push(pctime);
     curr_pc_buf.push(tmpPC);
     m_curr_pc_buf.unlock();
 }
@@ -198,7 +200,7 @@ void VIO::processImage(sensor_msgs::PointCloud2ConstPtr& imagePoints2)
 	removeOutliers(vip);
 
 	// solve it angin 
-	solveOdometry(vip); 
+	solveOdometry(vip, floor_detected()); 
 
 	// slide for next loop 
 	slideWindow(); 
@@ -211,6 +213,91 @@ void VIO::processImage(sensor_msgs::PointCloud2ConstPtr& imagePoints2)
     prepareForDisplay(vip);
 
     return ; 
+}
+
+bool VIO::floor_detected()
+{
+    // retrieve current point cloud 
+    pcl::PointCloud<pcl::PointXYZI>::Ptr tmp_pc(new pcl::PointCloud<pcl::PointXYZI>);
+    m_curr_pc_buf.lock(); 
+    while(!curr_pctime_buf.empty())
+    {
+        double tmp = curr_pctime_buf.front(); 
+        if(tmp < mTimeCurr)
+        {
+            curr_pctime_buf.pop(); 
+            curr_pc_buf.pop(); 
+        }
+        else if(tmp == mTimeCurr)
+        {
+            ROS_DEBUG("vio.cpp: succeed set current pointcloud at t = %lf", mTimeCurr);
+            tmp_pc = curr_pc_buf.front();
+            curr_pctime_buf.pop(); 
+            curr_pc_buf.pop(); 
+            break;
+        }else{ // tmp > t
+            ROS_WARN("vio.cpp: no current point cloud available for t= %lf", mTimeCurr);
+            break; 
+        }
+    }
+    m_curr_pc_buf.unlock(); 
+
+    if(tmp_pc->points.size() < 100)
+        return false; 
+    if(mbFirstFloorObserved == false) // first floor has not been observed
+        return false; 
+
+    // transform point cloud into world coordinate system 
+    pcl::PointCloud<pcl::PointXYZ>::Ptr tmp_pc2(new pcl::PointCloud<pcl::PointXYZ>); 
+    tmp_pc2->points.reserve(tmp_pc->points.size()); 
+    for(int i=0; i<tmp_pc->points.size(); i++)
+    {
+        pcl::PointXYZI& pt = tmp_pc->points[i]; 
+        tf::Vector3 pj(pt.x, pt.y, pt.z); 
+        tf::Vector3 pi = mCurrPose * pj; 
+        pcl::PointXYZ ptw(pi.getX(), pi.getY(), pi.getZ());
+        if(ptw.z < mFloorZ + mFloorRange && pt.z > mFloorZ - mFloorRange)
+        {
+            tmp_pc2->points.push_back(ptw); 
+        }
+    }
+
+    if(tmp_pc2->points.size() < 200) // not a reliable observation
+    {
+        return false; 
+    }
+
+    // extract floor 
+    Eigen::Vector3d nv; 
+    double nd; 
+    pcl::PointIndices::Ptr indices(new pcl::PointIndices); 
+    ((Plane*)(0))->computeByPCL<pcl::PointXYZ>(tmp_pc2, indices, nv, nd); 
+    Eigen::Vector3d g(Pls[0][0], Pls[0][1], Pls[0][2]); 
+    double angle = nv.dot(g); 
+    const double COS30 = cos(30.*M_PI/180.);
+    cout<<"vio.cpp: Floor plane in current PC has "<<indices->indices.size()<<" points nv = "<<nv.transpose()<<endl;
+    if(indices->indices.size() < 200 || angle < COS30) // NO Floor plane is detected 
+    {
+        return false; 
+    }
+    
+    // save current floor points for debug 
+    // mCurrPCFloor->clear();
+    // mCurrPCFloor->points.reserve(indices->indices.size());
+    // for(int i=0; i<indices->indices.size(); i++)
+    // {
+    //     mCurrPCFloor->points.push_back(tmp_pc2->points[indices->indices[i]]);
+    // }
+    // mCurrPCFloor->width = mCurrPCFloor->points.size(); 
+    // mCurrPCFloor->height = 1;
+    // mCurrPCFloor->is_dense = true;
+
+    // reset current plane observation 
+    Pls[WN][0] = nv(0); 
+    Pls[WN][1] = nv(1); 
+    Pls[WN][2] = nv(2); 
+    Pls[WN][3] = nd;
+    return true;
 }
 
 void VIO::removeWrongTri(vector<ip_M>& ipRelations)
@@ -391,7 +478,7 @@ void VIO::slideWindow()
     
 }
 
-void VIO::solveOdometry(vector<ip_M>& vip)
+void VIO::solveOdometry(vector<ip_M>& vip, bool use_floor_plane)
 {
     ceres::Problem problem;
     ceres::LossFunction *loss_function;
@@ -904,7 +991,7 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
 
     double min_z, max_z; 
 
-    if(mFloorZ == -10000) //     
+    if(mFloorZ == NOT_INITIED) //     
     {	
 	// double max_z = 0.1; 
 	// double min_z = -1.5; 
@@ -952,7 +1039,7 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
 	    }
 	    ++it; 
 	}
-    if(mFloorZ == -10000)
+    if(mFloorZ == NOT_INITIED)
 	   mFloorZ = min_z + max_id*res; 
     else {
         if(max_n > 100)
@@ -996,6 +1083,14 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
         cout<<"failed to take it as a plane ! "<<endl;
     }else // succeed to get a floor plane 
     { 
+        if(mbFirstFloorObserved == false)
+        {
+            mbFirstFloorObserved = true; 
+            Pls[0][0] = nv(0); 
+            Pls[0][1] = nv(1); 
+            Pls[0][2] = nv(2); 
+            Pls[0][3] = nd;
+        }
         // save floor points for display 
         mPCFloor->points.reserve(indices->indices.size()); 
         double sum_z = 0; 

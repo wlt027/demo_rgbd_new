@@ -27,6 +27,7 @@
 using namespace std; 
 
 const static int WN = 1; 
+const static int NOT_INITIED = -100000;
 
 struct ip_M
 {
@@ -48,7 +49,7 @@ public:
     void processImage(sensor_msgs::PointCloud2ConstPtr& );
     void processDepthCloud(sensor_msgs::PointCloud2ConstPtr& );
 
-    void solveOdometry(vector<ip_M>& ); 
+    void solveOdometry(vector<ip_M>& , bool use_floor_plane = false); 
     void initialize(); 
     void associateFeatures(vector<ip_M>& vip); 
     void prepareNextLoop(); 
@@ -67,10 +68,11 @@ public:
     void rejectByF(vector<ip_M>& ipRelations);
 
     // remove floor points 
+    bool floor_detected();
     void removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in, boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& out);
 
-    void processCurrDepthCloud(sensor_msgs::PointCloud2ConstPtr& );
-    queue<double> curr_pc_time_buf; 
+    void processCurrDepthCloud(const sensor_msgs::PointCloud2ConstPtr& );
+    queue<double> curr_pctime_buf; 
     queue<boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> > > curr_pc_buf;
     std::mutex m_curr_pc_buf;
     
@@ -116,6 +118,7 @@ public:
     boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> > mImagePointsProj;
     boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> > mPCNoFloor;
     boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> > mPCFloor;
+    boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> > mCurrPCFloor; // for debug 
     vector<ip_M> mPtRelations;    
 
     Eigen::Vector3d mg;
@@ -128,6 +131,9 @@ public:
     Eigen::Matrix3d Rs[WN+1]; 
     Eigen::Vector3d Bas[WN+1]; 
     Eigen::Vector3d Bgs[WN+1]; 
+
+    Eigen::Matrix<double, 4, 1> Pls[WN+1]; // planes 
+    volatile bool mbFirstFloorObserved; 
     
     bool mbFirstIMU; 
     Vector3d acc_0; 

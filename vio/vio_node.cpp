@@ -92,8 +92,8 @@ void depthCloudHandler(const sensor_msgs::PointCloud2ConstPtr& depthCloud2)
 
 void currDepthCloudHandler(const sensor_msgs::PointCloud2ConstPtr& depthCloud2)
 {
-    cout<<"vio_node.cpp: succeed to get depthcloud at current stamp: "<<std::fixed<<depthCloud2->header.stamp.toSec()<<endl;
-    // vio.processCurrDepthCloud(depthCloud2);
+    // cout<<"vio_node.cpp: succeed to get depthcloud at current stamp: "<<std::fixed<<depthCloud2->header.stamp.toSec()<<endl;
+    vio.processCurrDepthCloud(depthCloud2);
 }
 
 void send_imu(const sensor_msgs::ImuConstPtr &imu_msg)
@@ -343,6 +343,7 @@ void publishMsg(sensor_msgs::PointCloud2ConstPtr& img_msg)
             // publish floor point 
             sensor_msgs::PointCloud2 floorPC2; 
             pcl::toROSMsg(*(vio.mPCFloor), floorPC2); 
+            // pcl::toROSMsg(*(vio.mCurrPCFloor), floorPC2); 
             floorPC2.header.frame_id = "world"; 
             floorPC2.header.stamp = ros::Time().fromSec(vio.mTimeLast); 
             floorPCPubPointer->publish(floorPC2);
