@@ -11,32 +11,38 @@
 #include "../utility/utility.h"
 #include "../utility/tic_toc.h"
 
-namespace QUATERNION_VIO 
+namespace Eigen
 {
-
 typedef Eigen::Matrix<double, 3, 2> Matrix32; 
 typedef Eigen::Matrix<double, 6, 2> Matrix62; 
+}
+
+namespace QUATERNION_VIO 
+{
 
 class Unit3
 {   
   public:
+    Unit3();
     Unit3(Eigen::Vector3d& n); 
     ~Unit3();
-    Matrix32 getBasis(Matrix62* H = NULL);
+    Eigen::Matrix32 getBasis(Eigen::Matrix62* H = NULL) ;
     Eigen::Vector3d p_; 
-    Matrix32* B_; 
-    Matrix62* H_B_; 
+    Eigen::Matrix32* B_; 
+    Eigen::Matrix62* H_B_; 
 };
 
 class PlaneFactor_P1 : public ceres::SizedCostFunction<3, 7>
 {
   public:
     PlaneFactor_P1(const Eigen::Matrix<double,4,1>& plane_g, const Eigen::Matrix<double, 4, 1>& plane_l); 
-    virtual bool Evaluate(double const* const* parameters, double *residuals, double **jacobians) const; 
+    virtual bool Evaluate(double const* const* parameters, double *residuals, double **jacobians) const;
     void check(double ** parameters);
-    Eigen::Vector3d nv_g, nv_l;  // normal vector
+    // Eigen::Vector3d nv_g, nv_l;  // normal vector
+    Unit3 nv_g; 
+    Unit3 nv_l;
     double d_g, d_l;  // distance 
-    Eigen::Matrix2d sqrt_info; 
+    Eigen::Matrix3d sqrt_info; 
 };
 
 class ProjectionFactor_Y2 : public ceres::SizedCostFunction<1, 7, 7, 7, 1>

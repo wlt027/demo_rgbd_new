@@ -39,6 +39,8 @@ void read_iprelation_log(vector<ip_M>& vip, string log_file);
 void random_iprelation(vector<ip_M>& vip, Eigen::Matrix<double, 7, 1>& pose); 
 void vo_pnp(vector<ip_M>& vip, Eigen::Matrix<double, 7, 1>& );
 
+void test_plane(); 
+
 int main(int argc, char* argv[])
 {
     // test(); 
@@ -46,7 +48,8 @@ int main(int argc, char* argv[])
     if(argc >= 2)
 	log_file = string(argv[1]); 
 
-    test_ceres(); 
+    // test_ceres(); 
+    test_plane(); 
     return 1; 
 }
 
@@ -167,6 +170,25 @@ void test_ceres()
 
     return ; 
 
+}
+
+void test_plane()
+{
+    Eigen::Matrix<double, 4, 1> l_plane(-1, 0.1, 0.2, 5); 
+    Eigen::Matrix<double, 4, 1> g_plane(-1.1, 0.2, 0.3, 5.4);
+    PlaneFactor_P1 * f = new PlaneFactor_P1(g_plane, l_plane);
+    double ** para = new double*[1]; 
+    para[0] = new double[7]; // pose_i 
+    double qx =  0.1; 
+    double qy =  -0.2; 
+    double qz =  0.5; 
+    double qw = sqrt(1 - qx*qx - qy*qy - qz*qz); 
+
+    Eigen::Vector3d Pi(1, -2, 3); 
+    para[0][0] = Pi(0); para[0][1] = Pi(1); para[0][2] = Pi(2); 
+    para[0][3] = qx; para[0][4] = qy; para[0][5] = qz; para[0][6] = qw; 
+    f->check(para); 
+    
 }
 
 void test()

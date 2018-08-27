@@ -9,9 +9,15 @@
 #include <iostream>
 
 using namespace std; 
+using namespace Eigen;
 
 namespace QUATERNION_VIO{
 
+
+Unit3::Unit3():
+p_(0, 0, 1.),
+B_(NULL),
+H_B_(NULL){}
 
 Unit3::Unit3(Eigen::Vector3d& n): p_(n.normalized()),
 B_(NULL),
@@ -31,7 +37,7 @@ Unit3::~Unit3()
         H_B_ = NULL;
     }
 }
-Eigen::Matrix<double, 3, 2> Unit3::getBasis(Matrix62* H)
+Eigen::Matrix<double, 3, 2> Unit3::getBasis(Eigen::Matrix62* H) 
 {
     if(B_ && !H)
         return *B_;
@@ -55,7 +61,7 @@ Eigen::Matrix<double, 3, 2> Unit3::getBasis(Matrix62* H)
     Eigen::Vector3d b1 = B1/B1.norm();
     Eigen::Vector3d b2 = n.cross(b1); 
     if(B_ == NULL)
-        B_ = new Matrix32; 
+        B_ = new Eigen::Matrix32; 
     *(B_) << b1.x(), b2.x(), b1.y(), b2.y(), b1.z(), b2.z(); 
 
     if(H)
@@ -74,7 +80,7 @@ Eigen::Matrix<double, 3, 2> Unit3::getBasis(Matrix62* H)
         Matrix32 d_b1_d_p = d_b1_d_B1 * d_B1_d_n * d_n_d_p; 
         Matrix32 d_b2_d_p = d_b2_d_b1 * d_b1_d_p + d_b2_d_n * d_n_d_p; 
         if(H_B_ == NULL)
-            H_B_ = new Matrix62; 
+            H_B_ = new Eigen::Matrix62; 
         (*H_B_) << d_b1_d_p, d_b2_d_p; 
         *H = *H_B_;
     }
@@ -91,7 +97,7 @@ PlaneFactor_P1::PlaneFactor_P1(const Eigen::Matrix<double,4,1>& plane_g, const E
 
     d_g = plane_g(3); 
     d_l = plane_l(3); 
-    sqrt_info = 10; 
+    sqrt_info = Eigen::Matrix3d::Identity() * 30.; 
 }
 
 bool PlaneFactor_P1::Evaluate(double const *const *parameters, double *residuals, double **jacobians) const
@@ -104,15 +110,16 @@ bool PlaneFactor_P1::Evaluate(double const *const *parameters, double *residuals
     Eigen::Vector3d nl_e = Qi_inv*nv_g.p_; 
     nl_e /= nl_e.norm();
     Unit3 nl(nl_e);
-    double dl = nv_g.dot(Pi) + d_g;
+    double dl = nv_g.p_.dot(Pi) + d_g;
    
     Eigen::Map<Eigen::Vector3d> residual(residuals);
-    Matrix62 d_B_d_p; 
-    Eigen::Matrix<double, 3, 2> B = nv_l.getBasis(d_B_d_p); 
+    Eigen::Matrix62 d_B_d_p; 
+    Eigen::Matrix<double, 3, 2> B = nv_l.getBasis(&d_B_d_p); 
     Eigen::Matrix<double, 2, 3> Bt = B.transpose();
     residual.block<2,1>(0,0) = Bt * nl.p_; 
     residual(2) = d_l - dl; 
- 
+    residual = sqrt_info * residual; 
+
     if(jacobians)
     {
         Eigen::Matrix<double, 3, 6> d_nl_dTgl = Eigen::Matrix<double, 3, 6>::Zero(); 
@@ -126,13 +133,14 @@ bool PlaneFactor_P1::Evaluate(double const *const *parameters, double *residuals
         // Eigen::Matrix<double, 1, 2> d_r2_d_p = d_r2_d_b2 * d_b2_d_p; 
         // Eigen::Matrix<double, 2, 2> d_r_d_p; 
         // d_r_d_p << d_r1_d_p, d_r2_d_p;
-        Eigen::Matrix<2,2> d_r_d_nl; 
+        Eigen::Matrix<double, 2,2> d_r_d_nl; 
         Matrix32 d_nlp_d_nl = nl.getBasis(); 
-        Matrix32 d_r_d_nlp = Bt; 
+        Matrix<double,2,3> d_r_d_nlp = Bt; 
         d_r_d_nl = d_r_d_nlp * d_nlp_d_nl; 
-        Eigen::Matrix<2, 6> d_r_d_Tgl = d_r_d_nl * d_nl_dTgl; 
-        Eigen::Matrix<1, 6> d_r3_d_Tgl; 
-        d_r3_d_Tgl << 0, 0, 0, -nv_g(0), -nv_g(1), -nv_g(2); 
+	Eigen::Matrix<double, 2, 6> d_nl_dTgl_2 = d_nl_dTgl.block<2,6>(0,0);
+        Eigen::Matrix<double, 2, 6> d_r_d_Tgl = d_r_d_nl * d_nl_dTgl_2; 
+        Eigen::Matrix<double, 1, 6> d_r3_d_Tgl; 
+        d_r3_d_Tgl << -nv_g.p_(0), -nv_g.p_(1), -nv_g.p_(2), 0, 0, 0; 
 
         if(jacobians[0])
         {
@@ -146,6 +154,8 @@ bool PlaneFactor_P1::Evaluate(double const *const *parameters, double *residuals
             // dd_dq = 0, 
             jacobian_pose_i.block<1,6>(2,0) = d_r3_d_Tgl; 
             
+	    jacobian_pose_i.block<3,6>(0,0) = sqrt_info * jacobian_pose_i.block<3,6>(0,0); 
+
             jacobian_pose_i.rightCols<1>().setZero(); 
         }
     }
@@ -153,7 +163,7 @@ bool PlaneFactor_P1::Evaluate(double const *const *parameters, double *residuals
     return true; 
 }
 
-bool PlaneFactor_P1::check(double ** parameters)
+void PlaneFactor_P1::check(double ** parameters)
 {
     double *res = new double[1]; 
     double **jaco = new double *[1]; 
@@ -161,8 +171,10 @@ bool PlaneFactor_P1::check(double ** parameters)
     Evaluate(parameters, res, jaco); 
     puts("check begins"); 
     puts("my"); 
+    
+    Eigen::Map<Eigen::Vector3d > res_v(res); 
 
-    cout <<"res: "<<res[0]<<endl; 
+    cout <<"res: "<<res_v.transpose()<<endl; 
     cout <<Eigen::Map<Eigen::Matrix<double, 3, 7, Eigen::RowMajor> >(jaco[0]) <<endl; 
   
     Eigen::Vector3d Pi(parameters[0][0], parameters[0][1], parameters[0][2]);
@@ -170,13 +182,13 @@ bool PlaneFactor_P1::check(double ** parameters)
 
     Eigen::Quaterniond Qi_inv = Qi.inverse(); 
     Eigen::Vector3d nl_e = Qi_inv*nv_g.p_; 
-    nl_e /= nl_e.length();
+    nl_e /= nl_e.norm();
     Unit3 nl(nl_e);
-    double dl = nv_g.dot(Pi) + d_g;
+    double dl = nv_g.p_.dot(Pi) + d_g;
    
     Eigen::Vector3d y2;
-    Matrix62 d_B_d_p; 
-    Eigen::Matrix<double, 3, 2> B = nv_l.getBasis(d_B_d_p); 
+    Eigen::Matrix62 d_B_d_p; 
+    Eigen::Matrix<double, 3, 2> B = nv_l.getBasis(&d_B_d_p); 
     Eigen::Matrix<double, 2, 3> Bt = B.transpose();
     y2.block<2,1>(0,0) = Bt * nl.p_; 
     y2(2) = d_l - dl; 
@@ -202,21 +214,21 @@ bool PlaneFactor_P1::check(double ** parameters)
 
         Eigen::Quaterniond Qi_inv = Qi.inverse(); 
         Eigen::Vector3d nl_e = Qi_inv*nv_g.p_; 
-        nl_e /= nl_e.length();
+        nl_e /= nl_e.norm();
         Unit3 nl(nl_e);
-        double dl = nv_g.dot(Pi) + d_g;
+        double dl = nv_g.p_.dot(Pi) + d_g;
        
-        Eigen::Vector3d y2;
-        Matrix62 d_B_d_p; 
-        Eigen::Matrix<double, 3, 2> B = nv_l.getBasis(d_B_d_p); 
+        Eigen::Matrix62 d_B_d_p; 
+        Eigen::Matrix<double, 3, 2> B = nv_l.getBasis(&d_B_d_p); 
         Eigen::Matrix<double, 2, 3> Bt = B.transpose();
         tmp_y2.block<2,1>(0,0) = Bt * nl.p_; 
         tmp_y2(2) = d_l - dl; 
-        num_jacobians(k) = (tmp_y2 - y2)/eps; 
+	// cout<<"tmp_y2: "<<tmp_y2.transpose()<<" y2: "<<y2.transpose()<<endl;
+        num_jacobians.col(k) = (tmp_y2 - y2)/eps; 
     }
     cout<<num_jacobians<<endl; 
 
-    return true;   
+    return ;   
 }
 
 ProjectionFactor_Y2::ProjectionFactor_Y2(const Eigen::Vector3d &_pts_i, const Eigen::Vector3d &_pts_j): 

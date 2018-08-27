@@ -2,7 +2,7 @@ project(demo_rgbd_new)
 
 cmake_minimum_required(VERSION 2.8.3)
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -w -g -O3")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -w -g -O3 -fpermissive")
 SET(CMAKE_BUILD_TYPE "RelWithDebInfo")
 
 if(COMMAND cmake_policy)

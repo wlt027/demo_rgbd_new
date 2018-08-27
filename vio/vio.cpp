@@ -292,7 +292,21 @@ bool VIO::floor_detected()
     // mCurrPCFloor->height = 1;
     // mCurrPCFloor->is_dense = true;
 
-    // reset current plane observation 
+    // reset current plane observation, within world frame,
+    // now transfer it into current IMU frame 
+    {
+	tf::Quaternion tq = mCurrIMUPose.getRotation(); 
+	tf::Vector3 tt = mCurrIMUPose.getOrigin(); 
+	
+	Eigen::Quaterniond q(tq.getW(), tq.getX(), tq.getY(), tq.getZ()); 
+	Eigen::Vector3d t(tt.getX(), tt.getY(), tt.getZ()); 
+	
+	Eigen::Vector3d nl = q.inverse() * nv; 
+	double dl = nv.dot(t) + nd; 
+	nv = nl; 
+	nd = dl; 
+    }
+
     Pls[WN][0] = nv(0); 
     Pls[WN][1] = nv(1); 
     Pls[WN][2] = nv(2); 
@@ -516,7 +530,15 @@ void VIO::solveOdometry(vector<ip_M>& vip, bool use_floor_plane)
     // cout<<"IMU factor covariance: "<<endl<<imu_factor->pre_integration->covariance<<endl;
 	problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
     }
-
+    
+    // add plane factor 
+    if(use_floor_plane)
+    {
+	cout<<"vio.cpp: add plane_factor with plane_g: "<<Pls[0].transpose()<<" plane_l: "<<Pls[1].transpose()<<endl;
+	PlaneFactor_P1 * plane_factor = new PlaneFactor_P1(Pls[0], Pls[1]); 
+	problem.AddResidualBlock(plane_factor, NULL, para_Pose[1]);
+    }
+    
     // add feature factor 
     const float INIT_DIS = 10; 
     int N = vip.size(); 
@@ -651,7 +673,7 @@ void VIO::priorOptimize(vector<ip_M>& vip)
 	para_Ex_Pose[i][5] = q.z();
 	para_Ex_Pose[i][6] = q.w();
     }
-
+    
     for(int i=0; i<vip.size() && i< NUM_OF_FEAT; i++)
     {
 	ip_M& m = vip[i]; 
