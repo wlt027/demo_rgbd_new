@@ -97,7 +97,7 @@ PlaneFactor_P1::PlaneFactor_P1(const Eigen::Matrix<double,4,1>& plane_g, const E
 
     d_g = plane_g(3); 
     d_l = plane_l(3); 
-    sqrt_info = Eigen::Matrix3d::Identity() * 30.; 
+    sqrt_info = Eigen::Matrix3d::Identity() * 100.; 
 }
 
 bool PlaneFactor_P1::Evaluate(double const *const *parameters, double *residuals, double **jacobians) const
@@ -185,13 +185,15 @@ void PlaneFactor_P1::check(double ** parameters)
     nl_e /= nl_e.norm();
     Unit3 nl(nl_e);
     double dl = nv_g.p_.dot(Pi) + d_g;
-   
+
+    Eigen::Matrix<double, 3, 3> sqrt_info = Eigen::Matrix<double, 3, 3>::Identity()*100.;   
     Eigen::Vector3d y2;
     Eigen::Matrix62 d_B_d_p; 
     Eigen::Matrix<double, 3, 2> B = nv_l.getBasis(&d_B_d_p); 
     Eigen::Matrix<double, 2, 3> Bt = B.transpose();
     y2.block<2,1>(0,0) = Bt * nl.p_; 
     y2(2) = d_l - dl; 
+    y2 = sqrt_info * y2; 
 
     puts("num"); 
     cout << "res: "<<y2.transpose()<<endl; 
@@ -223,6 +225,7 @@ void PlaneFactor_P1::check(double ** parameters)
         Eigen::Matrix<double, 2, 3> Bt = B.transpose();
         tmp_y2.block<2,1>(0,0) = Bt * nl.p_; 
         tmp_y2(2) = d_l - dl; 
+        tmp_y2 = sqrt_info * tmp_y2;
 	// cout<<"tmp_y2: "<<tmp_y2.transpose()<<" y2: "<<y2.transpose()<<endl;
         num_jacobians.col(k) = (tmp_y2 - y2)/eps; 
     }
