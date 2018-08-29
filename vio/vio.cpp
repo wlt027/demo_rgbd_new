@@ -41,7 +41,7 @@ mdisThresholdForTriangulation(1.), // 1.
 mFtObsCurr(new pcl::PointCloud<ImagePoint>),
 mFtObsLast(new pcl::PointCloud<ImagePoint>),
 mImagePointsProj(new pcl::PointCloud<pcl::PointXYZ>),
-mPCNoFloor(new pcl::PointCloud<pcl::PointXYZ>),
+mPCNoFloor(new pcl::PointCloud<pcl::PointXYZI>),
 mPCFloor(new pcl::PointCloud<pcl::PointXYZ>),
 mCurrPCFloor(new pcl::PointCloud<pcl::PointXYZ>),
 mbFirstIMU(true),
@@ -1004,7 +1004,7 @@ void VIO::associateFeatures(vector<ip_M>& vip)
 }
 
 
-void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in, boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& out)
+void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in, boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> >& out)
 {
     TicToc t_fz; 
     if(in->points.size() < 100)
@@ -1099,7 +1099,13 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
             double pz = in->points[i].z; 
             if(pz > mFloorZ + 3*mFloorRange)
             {
-              out->points.push_back(in->points[i]); 
+              // out->points.push_back(in->points[i]); 
+		pcl::PointXYZI pt; 
+		pt.x = in->points[i].x; 
+		pt.y = in->points[i].y; 
+		pt.z = in->points[i].z; 
+		pt.intensity = pz - mFloorZ; // intensity contains distance to floor plane 
+		out->points.push_back(pt); 
             }
         }
         cout<<"failed to take it as a plane ! "<<endl;
@@ -1134,7 +1140,13 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
             double dis = nv.dot(pt) + nd; 
             if(dis > 2*mFloorRange)
             {
-                out->points.push_back(in->points[i]);
+                // out->points.push_back(in->points[i]);
+		pcl::PointXYZI pt; 
+		pt.x = in->points[i].x; 
+		pt.y = in->points[i].y; 
+		pt.z = in->points[i].z; 
+		pt.intensity = dis; // intensity contains distance to floor plane 
+		out->points.push_back(pt); 
             }
         }
     }

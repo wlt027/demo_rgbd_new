@@ -176,7 +176,7 @@ int main(int argc, char **argv)
     ros::Publisher voDataPub = nh.advertise<nav_msgs::Odometry> ("/cam_to_init", 5);
     voDataPubPointer = &voDataPub;
     
-    ros::Publisher vioDataPub = nh.advertise<nav_msgs::Odometry>("/imu_to_world", 5); 
+    ros::Publisher vioDataPub = nh.advertise<nav_msgs::Odometry>("/world_to_imu", 5); 
     vioDataPubPointer = &vioDataPub; 
 
     ros::Subscriber imageDataSub = nh.subscribe<sensor_msgs::Image>("/image/show", 1, imageDataHandler);
