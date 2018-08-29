@@ -69,7 +69,7 @@ public:
 
     // remove floor points 
     bool floor_detected();
-    void removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in, boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& out);
+    void removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in, boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> >& out);
 
     void processCurrDepthCloud(const sensor_msgs::PointCloud2ConstPtr& );
     queue<double> curr_pctime_buf; 
@@ -116,7 +116,7 @@ public:
 
     // to display the 3d point cloud of the features 
     boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> > mImagePointsProj;
-    boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> > mPCNoFloor;
+    boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> > mPCNoFloor;
     boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> > mPCFloor;
     boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> > mCurrPCFloor; // for debug 
     vector<ip_M> mPtRelations;    
