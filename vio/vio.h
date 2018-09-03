@@ -70,6 +70,7 @@ public:
     // remove floor points 
     bool floor_detected();
     void removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in, boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> >& out);
+    Eigen::Quaterniond rotateToG(Eigen::Vector3d& fv);
 
     void processCurrDepthCloud(const sensor_msgs::PointCloud2ConstPtr& );
     queue<double> curr_pctime_buf; 

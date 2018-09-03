@@ -681,6 +681,24 @@ void VIO::priorOptimize(vector<ip_M>& vip)
     }
 }
 
+Eigen::Quaterniond VIO::rotateToG(Eigen::Vector3d& fv)
+{
+      // compute rotation for the first pose 
+    // Eigen::Vector3d fv(ax, ay, az); 
+    Eigen::Vector3d tv(0, 0, 1);  // vn100's gz points to upwards
+    Eigen::Vector3d w = fv.cross(tv).normalized(); 
+    double angle = acos(fv.dot(tv)); 
+    
+    double half_angle = angle /2.;
+    Eigen::Vector4d vq; 
+    vq.head<3>() = w * sin(half_angle); 
+    vq[3] = cos(half_angle); 
+
+    // cout <<"w = "<<w.transpose()<<" angle = "<<angle<<" vq = "<<vq.transpose()<<endl; 
+    Eigen::Quaterniond q(vq); 
+    return q;
+}
+
 void VIO::initialize()
 {
     double ax = 0; 
@@ -708,19 +726,9 @@ void VIO::initialize()
     
     double len = sqrt(ax*ax + ay*ay + az*az); 
     ax /= len; ay /= len; az /= len; 
-    // compute rotation for the first pose 
-    Eigen::Vector3d fv(ax, ay, az); 
-    Eigen::Vector3d tv(0, 0, 1);  // vn100's gz points to upwards
-    Eigen::Vector3d w = fv.cross(tv).normalized(); 
-    double angle = acos(fv.dot(tv)); 
     
-    double half_angle = angle /2.;
-    Eigen::Vector4d vq; 
-    vq.head<3>() = w * sin(half_angle); 
-    vq[3] = cos(half_angle); 
-
-    // cout <<"w = "<<w.transpose()<<" angle = "<<angle<<" vq = "<<vq.transpose()<<endl; 
-    Eigen::Quaterniond q(vq); 
+    Eigen::Vector3d fv(ax, ay, az); 
+    Eigen::Quaterniond q = rotateToG(fv);
     Eigen::Matrix<double, 3, 3> m = q.toRotationMatrix(); 
     
     Eigen::Vector3d Z(0,0,0);
@@ -1114,9 +1122,21 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
         if(mbFirstFloorObserved == false)
         {
             mbFirstFloorObserved = true; 
+            /*
             Pls[0][0] = nv(0); 
             Pls[0][1] = nv(1); 
-            Pls[0][2] = nv(2); 
+            Pls[0][2] = nv(2); */
+            Eigen::Vector3d ni(nv(0), nv(1), nv(2));
+            Eigen::Quaterniond dq = rotateToG(ni); 
+            Eigen::Matrix3d dR = dq.toRotationMatrix(); 
+            Eigen::Vector3d new_v = dR*Vs[0];
+            Eigen::Matrix3d new_R = Rs[0]*dR.transpose(); 
+            Vs[0] = Vs[1] = new_v; 
+            Rs[0] = Rs[1] = new_R;
+
+            Pls[0][0] = 0; 
+            Pls[0][1] = 0; 
+            Pls[0][2] = 1.;
             Pls[0][3] = nd;
         }
         // save floor points for display 

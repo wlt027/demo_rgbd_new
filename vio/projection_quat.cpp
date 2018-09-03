@@ -97,7 +97,7 @@ PlaneFactor_P1::PlaneFactor_P1(const Eigen::Matrix<double,4,1>& plane_g, const E
 
     d_g = plane_g(3); 
     d_l = plane_l(3); 
-    sqrt_info = Eigen::Matrix3d::Identity() * 100.; 
+    sqrt_info = Eigen::Matrix3d::Identity() * 700.; 
 }
 
 bool PlaneFactor_P1::Evaluate(double const *const *parameters, double *residuals, double **jacobians) const
