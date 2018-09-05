@@ -137,7 +137,7 @@ bool PlaneFactor_P1::Evaluate(double const *const *parameters, double *residuals
         Matrix32 d_nlp_d_nl = nl.getBasis(); 
         Matrix<double,2,3> d_r_d_nlp = Bt; 
         d_r_d_nl = d_r_d_nlp * d_nlp_d_nl; 
-	Eigen::Matrix<double, 2, 6> d_nl_dTgl_2 = d_nl_dTgl.block<2,6>(0,0);
+	    Eigen::Matrix<double, 2, 6> d_nl_dTgl_2 = d_nl_dTgl.block<2,6>(0,0);
         Eigen::Matrix<double, 2, 6> d_r_d_Tgl = d_r_d_nl * d_nl_dTgl_2; 
         Eigen::Matrix<double, 1, 6> d_r3_d_Tgl; 
         d_r3_d_Tgl << -nv_g.p_(0), -nv_g.p_(1), -nv_g.p_(2), 0, 0, 0; 
@@ -154,7 +154,7 @@ bool PlaneFactor_P1::Evaluate(double const *const *parameters, double *residuals
             // dd_dq = 0, 
             jacobian_pose_i.block<1,6>(2,0) = d_r3_d_Tgl; 
             
-	    jacobian_pose_i.block<3,6>(0,0) = sqrt_info * jacobian_pose_i.block<3,6>(0,0); 
+	        jacobian_pose_i.block<3,6>(0,0) = sqrt_info * jacobian_pose_i.block<3,6>(0,0); 
 
             jacobian_pose_i.rightCols<1>().setZero(); 
         }
