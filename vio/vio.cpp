@@ -1091,6 +1091,8 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
           tmp->points.push_back(in->points[i]); 
         }
     }
+    if(tmp->points.size() < 150)
+        return ; 
     Eigen::Vector3d nv; 
     double nd; 
     pcl::PointIndices::Ptr indices(new pcl::PointIndices); 
@@ -1099,7 +1101,7 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
     double angle = nv.dot(g); 
     const double COS30 = cos(30.*M_PI/180.);
     cout<<"Floor plane has indices.size = "<<indices->indices.size()<<" points nv = "<<nv.transpose()<<endl;
-    if(indices->indices.size() < 150 || angle < COS30) // NO Floor plane is observed 
+    if(indices->indices.size() < 100 || angle < COS30) // NO Floor plane is observed 
     {
         out->points.reserve(in->points.size()); 
         for(int i=0; i<in->points.size(); i++)
