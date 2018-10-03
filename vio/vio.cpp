@@ -275,7 +275,7 @@ bool VIO::floor_detected()
     Eigen::Vector3d g(Pls[0][0], Pls[0][1], Pls[0][2]); 
     double angle = nv.dot(g); 
     const double COS30 = cos(30.*M_PI/180.);
-    cout<<"vio.cpp: Floor plane in current PC has "<<indices->indices.size()<<" points nv = "<<nv.transpose()<<endl;
+    // cout<<"vio.cpp: Floor plane in current PC has "<<indices->indices.size()<<" points nv = "<<nv.transpose()<<endl;
     if(indices->indices.size() < 200 || angle < COS30) // NO Floor plane is detected 
     {
         return false; 
@@ -534,7 +534,7 @@ void VIO::solveOdometry(vector<ip_M>& vip, bool use_floor_plane)
     // add plane factor 
     if(use_floor_plane)
     {
-	cout<<"vio.cpp: add plane_factor with plane_g: "<<Pls[0].transpose()<<" plane_l: "<<Pls[1].transpose()<<endl;
+	// cout<<"vio.cpp: add plane_factor with plane_g: "<<Pls[0].transpose()<<" plane_l: "<<Pls[1].transpose()<<endl;
 	PlaneFactor_P1 * plane_factor = new PlaneFactor_P1(Pls[0], Pls[1]); 
 	problem.AddResidualBlock(plane_factor, NULL, para_Pose[1]);
     }
@@ -1039,14 +1039,13 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
         max_z = mFloorZ + 3*mFloorRange; 
     }
 
-	cout <<"removeFloorPts.cpp : min_z: "<<min_z<<" max_z: "<<max_z<<endl; 
+	// cout <<"removeFloorPts.cpp : min_z: "<<min_z<<" max_z: "<<max_z<<endl; 
 
 	//  histogram into different bins 
 	double res = 0.1; 
 	if(max_z - min_z > 2.0) max_z = min_z + 2.0; 
 	int n_bins = (max_z - min_z)/res + 1; 
 
-	cout <<"n_bins: "<<n_bins<<endl;
 	map<int, vector<int> > bins; 
 	for(int i=0; i<in->points.size(); i++)
 	{
@@ -1061,7 +1060,6 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
 	map<int, vector<int> >::iterator it = bins.begin();
 	while(it != bins.end())
 	{
-	    // cout <<"bin: "<<it->first<<" has: "<<it->second.size()<<endl;
 	    if(it->second.size() > max_n) 
 	    {
 		  max_n = it->second.size(); 
@@ -1075,8 +1073,6 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
         if(max_n > 100)
             mFloorZ = 0.5 * mFloorZ + 0.5 *(min_z + max_id*res);
     }
-
-	cout <<"max_id: "<<max_id<<" floor_z: "<<mFloorZ<<" max_n: "<<max_n<<endl; 
 
     // find floor plane 
     mPCFloor->clear(); 
@@ -1100,7 +1096,7 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
     Eigen::Vector3d g(0, 0, 1); 
     double angle = nv.dot(g); 
     const double COS30 = cos(30.*M_PI/180.);
-    cout<<"Floor plane has indices.size = "<<indices->indices.size()<<" points nv = "<<nv.transpose()<<endl;
+    // cout<<"Floor plane has indices.size = "<<indices->indices.size()<<" points nv = "<<nv.transpose()<<endl;
     if(indices->indices.size() < 100 || angle < COS30) // NO Floor plane is observed 
     {
         out->points.reserve(in->points.size()); 
@@ -1118,7 +1114,7 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
 		out->points.push_back(pt); 
             }
         }
-        cout<<"failed to take it as a plane ! "<<endl;
+        // cout<<"failed to take it as a plane ! "<<endl;
     }else // succeed to get a floor plane 
     { 
         if(mbFirstFloorObserved == false)
@@ -1150,7 +1146,7 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
             sum_z += tmp->points[indices->indices[i]].z; 
         }
         mFloorZ = sum_z/(indices->indices.size()); 
-        cout <<"succeed to find out floor plane, reset floor_Z = "<<mFloorZ<<endl;
+        cout <<"vio: succeed to find out floor plane, reset floor_Z = "<<mFloorZ<<endl;
 
         mPCFloor->width = mPCFloor->points.size(); 
         mPCFloor->height = 1;
@@ -1176,6 +1172,6 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
     out->width = out->points.size(); 
     out->height = 1; 
     out->is_dense = true; 
-    cout <<"vio.cpp: outpc has "<<out->points.size()<<" points floor_z = "<<mFloorZ<<endl;
+    // cout <<"vio.cpp: outpc has "<<out->points.size()<<" points floor_z = "<<mFloorZ<<endl;
     ROS_DEBUG("vio: remove floor cost %f ms", t_fz.toc()); 
 }

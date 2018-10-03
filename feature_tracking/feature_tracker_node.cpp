@@ -21,7 +21,8 @@ int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "feature_tracking");
     ros::NodeHandle nh;
-    ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
+    // ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
+    ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
 
     // ros::Subscriber imgDataSub = nh.subscribe<sensor_msgs::Image>("/image/raw", 1, imgCallback); 
     // ros::Subscriber imgDataSub = nh.subscribe<sensor_msgs::Image>("/camera/rgb/image_rect", 1, imgCallback); 

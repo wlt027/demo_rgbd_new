@@ -217,7 +217,7 @@ void DepthHandler::voDataHandler(const nav_msgs::Odometry::ConstPtr& vo_trans)
     tf::Vector3 tj(vo_t.x, vo_t.y, vo_t.z); 
     tf::Quaternion qj(vo_q.x, vo_q.y, vo_q.z, vo_q.w); 
     tf::Transform currPose(qj, tj); 
-    cout <<"DP: receive vo at "<<std::fixed<<time<<" location: "<<vo_t.x<<" "<< vo_t.y<<" "<<vo_t.z<<endl;
+    // cout <<"DP: receive vo at "<<std::fixed<<time<<" location: "<<vo_t.x<<" "<< vo_t.y<<" "<<vo_t.z<<endl;
     
     tf::Quaternion qi = mLastPose.getRotation(); 
     tf::Vector3 ti = mLastPose.getOrigin(); 
