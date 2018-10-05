@@ -3,9 +3,12 @@
     <arg name="config_file" default="$(find demo_rgbd_new)/config/robocane_config.yaml"/>
     <arg name="vins_folder" default="$(find demo_rgbd_new)/result/"/>
 
-  <node pkg="demo_rgbd_new" type="featureTracking_node" name="feature_tracking" output="screen"/>
-  <!-- node pkg="demo_rgbd_new" type="featureTracking_ori" name="feature_tracking_ori" output="screen"/-->
-  <node pkg="demo_rgbd_new" type="depth_handler_2" name="depth_handler" output="screen"/>
+  <node pkg="demo_rgbd_new" type="featureTracking_node" name="feature_tracking" output="screen">
+	<!--remap from="/cam0/color" to="/camera/color/image_raw"/-->
+  </node>
+  <node pkg="demo_rgbd_new" type="depth_handler_2" name="depth_handler" output="screen">
+	<!--remap from="/cam0/depth" to="/camera/aligned_depth_to_color/image_raw"/-->
+  </node>
 
   <node pkg="demo_rgbd_new" type="vio_node" name="vio_node" output="screen">
     <param name="config_file" type="string" value="$(arg config_file)"/>

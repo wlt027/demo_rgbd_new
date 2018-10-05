@@ -1,10 +1,7 @@
 <launch>
 
-	<include file="demo_pointcloud.launch">
-		<remap from="/camera/aligned_depth_to_color/image_raw" to="/cam0/depth"/>
-		<remap from="/camera/color/image_raw" to="/cam0/color"/>
-	</include>
-	
-	<include file="record_imu.launch"/>
+	<!--include file="demo_pointcloud.launch"/-->
+	<node pkg="demo_rgbd_new" type="rs_publisher" name="rs_publisher" output="screen"/>
+	<!--include file="record_imu.launch"/-->
 
 </launch>

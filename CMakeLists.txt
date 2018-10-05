@@ -36,6 +36,8 @@ find_package(catkin REQUIRED COMPONENTS
     std_msgs
     pcl_conversions
     pcl_ros
+    message_filters
+    image_transport
     # camera_model
     tf
 )
@@ -85,6 +87,9 @@ add_executable(depth_handler vo/depth_handler_node.cpp vo/depth_handler.cpp )
 add_executable(test_vio_proj_factor vio/test_projection.cpp vio/projection_quat.cpp)
 add_executable(depth_handler_2 vo/depth_handler.cpp vio/depth_handler_node.cpp)
 add_executable(vio_node vio/vio_node.cpp vio/vio.cpp vo/stereo_triangulate.cpp vio/projection_quat.cpp vio/parameters.cpp)
+
+## rs publisher
+add_executable(rs_publisher rs_pub/pub_rs_data.cpp)
 
 # target_link_libraries(featureTracking ${catkin_LIBRARIES} ${OpenCV_LIBS})
 # add_executable(visualOdometry src/visualOdometry.cpp)

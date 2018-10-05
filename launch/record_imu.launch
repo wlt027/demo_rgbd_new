@@ -4,6 +4,6 @@
 		<param name="publish_imu_msg" type="bool" value="true"/>
 		<param name="save_imu"	type="bool" value="false"/>
 		<param name="ttyUSB_id"	type="int"  value="1"/>
-		<param name="print_out"	type="bool" value="false"/>
+		<param name="print_out"	type="bool" value="true"/>
 	</node>
 </launch>

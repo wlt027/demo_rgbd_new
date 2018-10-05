@@ -238,9 +238,9 @@ void process()
 	    // estimator.processImage(image, img_msg->header);
 	    vio.processImage(img_msg); 
 	    double whole_t = t_s.toc();
-	    ROS_DEBUG("vio_node.cpp: vo cost %f ms", whole_t); 
+	    ROS_WARN("vio_node.cpp: vo cost %f ms", whole_t); 
 	    sum_vo_t += whole_t; 
-	    ROS_DEBUG("vio_node.cpp: average vo cost %f ms", sum_vo_t/(++sum_vo_cnt));
+	    ROS_WARN("vio_node.cpp: average vo cost %f ms", sum_vo_t/(++sum_vo_cnt));
 
         publishMsg(img_msg); 
 	}
