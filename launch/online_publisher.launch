@@ -1,0 +1,10 @@
+<launch>
+
+	<include file="demo_pointcloud.launch">
+		<remap from="/camera/aligned_depth_to_color/image_raw" to="/cam0/depth"/>
+		<remap from="/camera/color/image_raw" to="/cam0/color"/>
+	</include>
+	
+	<include file="record_imu.launch"/>
+
+</launch>
