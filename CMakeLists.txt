@@ -90,6 +90,7 @@ add_executable(vio_node vio/vio_node.cpp vio/vio.cpp vo/stereo_triangulate.cpp v
 
 ## rs publisher
 add_executable(rs_publisher rs_pub/pub_rs_data.cpp)
+add_executable(rs_publisher_rgbd rs_pub/pub_rs_data2.cpp)
 
 # target_link_libraries(featureTracking ${catkin_LIBRARIES} ${OpenCV_LIBS})
 # add_executable(visualOdometry src/visualOdometry.cpp)

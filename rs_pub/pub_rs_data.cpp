@@ -54,7 +54,7 @@ string gDataName("OBS");
 ros::Publisher rgb_pub; 
 ros::Publisher dpt_pub; 
 
-void ImageGrabberRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgAD);
+void ImageGrabberRGBD(const sensor_msgs::ImageConstPtr& msgAD,const sensor_msgs::ImageConstPtr& msgRGB);
 void ImageGrabberFull(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgAD, const sensor_msgs::ImageConstPtr& msgD, const sensor_msgs::ImageConstPtr& msgIr1, const sensor_msgs::ImageConstPtr& msgIr2);
 
 void rgbCb(const sensor_msgs::ImageConstPtr& msgRGB);
@@ -108,7 +108,7 @@ int main(int argc, char* argv[])
   // sync.registerCallback(boost::bind(&ImageGrabberFull,_1, _2, _3, _4, _5));
   
   // typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
-  // message_filters::Synchronizer<sync_pol> sync(sync_pol(q), rgb_sub, Adepth_sub);
+  // message_filters::Synchronizer<sync_pol> sync(sync_pol(q), Adepth_sub, rgb_sub);
   // sync.registerCallback(boost::bind(&ImageGrabberRGBD,_1, _2));
  
   ROS_WARN("realsense_wrapper.cpp: start to subscribe msgs!"); 
@@ -183,7 +183,7 @@ void dptCb(const sensor_msgs::ImageConstPtr& msgAD)
 }
 
 
-void ImageGrabberRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgAD)
+void ImageGrabberRGBD(const sensor_msgs::ImageConstPtr& msgAD,const sensor_msgs::ImageConstPtr& msgRGB)
 {
     // Copy the ros image message to cv::Mat.
     cv_bridge::CvImageConstPtr cv_ptrRGB;
