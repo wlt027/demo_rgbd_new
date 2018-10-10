@@ -1,7 +1,7 @@
 <launch>
 
-	<!--include file="demo_pointcloud.launch"/-->
-	<node pkg="demo_rgbd_new" type="rs_publisher" name="rs_publisher" output="screen"/>
-	<!--include file="record_imu.launch"/-->
+	<include file="demo_pointcloud.launch"/>
+	<node pkg="demo_rgbd_new" type="rs_publisher_rgbd" name="rs_publisher" output="screen"/>
+	<include file="record_imu.launch"/>
 
 </launch>

@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
   ros::NodeHandle nh; 
 
   ros::NodeHandle np("~"); 
-  ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
+  ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
 
   int q = 7; 
 
@@ -136,7 +136,7 @@ void rgbCb(const sensor_msgs::ImageConstPtr& msgRGB)
 }
 void dptCb(const sensor_msgs::ImageConstPtr& msgAD)
 {
-    ROS_INFO("receive dpt msg at time: %f", msgAD->header.stamp.toSec()); 
+    ROS_DEBUG("receive dpt msg at time: %f", msgAD->header.stamp.toSec()); 
     m_buf.lock(); 
     	dpt_buf.push(msgAD); 
     m_buf.unlock(); 

@@ -15,16 +15,20 @@
     <param name="vins_folder" type="string" value="$(arg vins_folder)"/>
   </node>
 
-  <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find demo_rgbd_new)/launch/vio_laser.rviz"/>
+  <!--node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find demo_rgbd_new)/launch/vio_laser.rviz"/-->
 
-   <node pkg="robocane" type="obstacle_avoid_node" name="obstacle_avoid_node" output="screen"/>
-   <!-- node pkg="vis_navigation" type="robocane_view_no_control" name="robocane_view" output="screen"/-->
-   <!-- node pkg="vis_navigation" type="loc_node" name="localization" output="screen"/-->
+   <node pkg="robocane" type="obstacle_avoid_node" name="obstacle_avoid_node" output="screen">
+   	<param name="publish_obstacle_pc" type="bool" value="false"/>
+   </node>
+   
    <node pkg="vis_navigation" type="ros_win_node" name="roswin_localization" output="screen">
     <param name="map_file_name" type="string" value="$(find vis_navigation)/floorplan/trimmed.png"/>
     <param name="start_x" type="double" value="30."/>
     <param name="start_y" type="double" value="140."/>
+    <param name="display_result" type="bool" value="true"/>
    </node> 
-   <node pkg="vis_navigation" type="robocane_view_no_control" name="robocane_view" output="screen"/>
+   <node pkg="vis_navigation" type="robocane_view_no_control" name="robocane_view" output="screen">
+   	<param name="display_result" type="bool" value="true"/>
+   </node>
 
 </launch>
