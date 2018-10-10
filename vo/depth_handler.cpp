@@ -81,8 +81,12 @@ void DepthHandler::cloudHandler2(const sensor_msgs::Image::ConstPtr& dpt_img_msg
     pcl::PointCloud<pcl::PointXYZI>::Ptr tmpPC(new pcl::PointCloud<pcl::PointXYZI>());
     double halfDS = mCloudDSRate/2. - 0.5; 
     
+    // median filter to get rid some noise 
     cv::Mat dpt_img = cv_bridge::toCvCopy(dpt_img_msg)->image;
-    
+    cv::Mat dst; 
+    cv::medianBlur(dpt_img, dst, 5 );  
+    dpt_img = dst; 
+
     // 
    // const float* syncCloud2Pointer = reinterpret_cast<const float*>(&dpt_img_msg->data[0]);
     float scale = 0.001; 

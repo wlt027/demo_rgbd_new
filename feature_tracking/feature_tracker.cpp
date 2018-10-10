@@ -191,68 +191,71 @@ bool CFeatureTracker::handleImage(const cv::Mat& _img, double img_time)
 	    }
 	}
     }
-    
-    // track the features 
-    vector<uchar> status; 
-    vector<float> err; 
-    cv::calcOpticalFlowPyrLK(mPreImg, mCurImg, mvPrePts, mvCurPts, status, err, cv::Size(mParam.mTrackWinSize, mParam.mTrackWinSize), 3); 
-    
+  
     for(int i=0; i<mParam.mTotalSubregionNum; i++)
     {
 	mvSubregionFeatureNum[i] = 0; 
     }
-    
-    // check which points are valid 
-    assert(mPreTotalFeatureNum == mvPrePts.size()); 
-    ImagePoint point; 
     int featureCount = 0; 
 
-    // mvPrePts only contains the points matched with mCurImg 
-    // while mvPreImagePts contains the points matched with mCurImg and with previous Image 
-    for(int i=0; i<mPreTotalFeatureNum; i++)
+    // track the features 
+    vector<uchar> status; 
+    vector<float> err; 
+    if(mvPrePts.size() > 0)
     {
-	if(!status[i] || !inBoard(mvPrePts[i]))
-	    continue; 
-	double trackDis = sqrt(SQ(mvCurPts[i].x - mvPrePts[i].x) + SQ(mvCurPts[i].y - mvPrePts[i].y)); 
-	
-	if(trackDis <= mParam.mMaxTrackDis)
+	cv::calcOpticalFlowPyrLK(mPreImg, mCurImg, mvPrePts, mvCurPts, status, err, cv::Size(mParam.mTrackWinSize, mParam.mTrackWinSize), 3); 
+
+	// check which points are valid 
+	assert(mPreTotalFeatureNum == mvPrePts.size()); 
+	ImagePoint point; 
+
+	// mvPrePts only contains the points matched with mCurImg 
+	// while mvPreImagePts contains the points matched with mCurImg and with previous Image 
+	for(int i=0; i<mPreTotalFeatureNum; i++)
 	{
-	    int xInd = (int)((mvPrePts[i].x - mParam.mXBoundary + 0.5)/mParam.mSubregionWidth); 
-	    int yInd = (int)((mvPrePts[i].y - mParam.mYBoundary + 0.5)/mParam.mSubregionHeight); 
-	    
-	    int ind = yInd * mParam.mXSubregionNum + xInd; 
+	    if(!status[i] || !inBoard(mvPrePts[i]))
+		continue; 
+	    double trackDis = sqrt(SQ(mvCurPts[i].x - mvPrePts[i].x) + SQ(mvCurPts[i].y - mvPrePts[i].y)); 
 
-	    if(mvSubregionFeatureNum[ind] < mParam.mMaxFeatureNumInSubregion)
+	    if(trackDis <= mParam.mMaxTrackDis)
 	    {
-		// this is a tracked pt in both pre and cur images
-		mvCurPts[featureCount] = mvCurPts[i];
-		mvPrePts[featureCount] = mvPrePts[i]; 
-		mvIds[featureCount] = mvIds[i]; 
-		
-		Eigen::Vector3d tmp; 
-		// mpCam->liftProjective(Eigen::Vector2d(mvCurPts[i].x, mvCurPts[i].y), tmp); 
-		tmp(0) = (mvCurPts[i].x - mParam.mcx)/mParam.mfx; 
-		tmp(1) = (mvCurPts[i].y - mParam.mcy)/mParam.mfy; 
-		point.u = tmp(0); 
-		point.v = tmp(1); 
-		point.ind = mvIds[i]; 
-		
-		// 
-		mvCurImagePts.push_back(point); 
-		
-		if(i >= recordFeatureNum) // new detected feature in preImg
-		{
-		    // mpCam->liftProjective(Eigen::Vector2d(mvPrePts[i].x, mvPrePts[i].y), tmp);
-		    // cout <<"mvPrePts: "<<mvPrePts[i].x<<" "<< mvPrePts[i].y<<" output: "<<tmp(0)<<" "<<tmp(1)<<endl;
-		    tmp(0) = (mvPrePts[i].x - mParam.mcx)/mParam.mfx; 
-		    tmp(1) = (mvPrePts[i].y - mParam.mcy)/mParam.mfy; 
+		int xInd = (int)((mvPrePts[i].x - mParam.mXBoundary + 0.5)/mParam.mSubregionWidth); 
+		int yInd = (int)((mvPrePts[i].y - mParam.mYBoundary + 0.5)/mParam.mSubregionHeight); 
 
+		int ind = yInd * mParam.mXSubregionNum + xInd; 
+
+		if(mvSubregionFeatureNum[ind] < mParam.mMaxFeatureNumInSubregion)
+		{
+		    // this is a tracked pt in both pre and cur images
+		    mvCurPts[featureCount] = mvCurPts[i];
+		    mvPrePts[featureCount] = mvPrePts[i]; 
+		    mvIds[featureCount] = mvIds[i]; 
+
+		    Eigen::Vector3d tmp; 
+		    // mpCam->liftProjective(Eigen::Vector2d(mvCurPts[i].x, mvCurPts[i].y), tmp); 
+		    tmp(0) = (mvCurPts[i].x - mParam.mcx)/mParam.mfx; 
+		    tmp(1) = (mvCurPts[i].y - mParam.mcy)/mParam.mfy; 
 		    point.u = tmp(0); 
 		    point.v = tmp(1); 
-		    mvPreImagePts.push_back(point); 
+		    point.ind = mvIds[i]; 
+
+		    // 
+		    mvCurImagePts.push_back(point); 
+
+		    if(i >= recordFeatureNum) // new detected feature in preImg
+		    {
+			// mpCam->liftProjective(Eigen::Vector2d(mvPrePts[i].x, mvPrePts[i].y), tmp);
+			// cout <<"mvPrePts: "<<mvPrePts[i].x<<" "<< mvPrePts[i].y<<" output: "<<tmp(0)<<" "<<tmp(1)<<endl;
+			tmp(0) = (mvPrePts[i].x - mParam.mcx)/mParam.mfx; 
+			tmp(1) = (mvPrePts[i].y - mParam.mcy)/mParam.mfy; 
+
+			point.u = tmp(0); 
+			point.v = tmp(1); 
+			mvPreImagePts.push_back(point); 
+		    }
+		    featureCount++;
+		    mvSubregionFeatureNum[ind]++; 
 		}
-		featureCount++;
-		mvSubregionFeatureNum[ind]++; 
 	    }
 	}
     }
