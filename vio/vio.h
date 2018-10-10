@@ -154,4 +154,7 @@ public:
     double para_Feature[NUM_OF_FEAT][SIZE_FEATURE];
     double para_Ex_Pose[NUM_OF_CAM][SIZE_POSE];
     // double para_Retrive_Pose[SIZE_POSE];
+
+    bool mbStill; // whether camera is still, which is inferred by pixel disparity 
+
 };

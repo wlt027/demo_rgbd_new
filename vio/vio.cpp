@@ -196,12 +196,13 @@ void VIO::processImage(sensor_msgs::PointCloud2ConstPtr& imagePoints2)
 	// solve odometry 
 	solveOdometry(vip); 
 
-	// remove outliers
-	removeOutliers(vip);
-
-	// solve it angin 
-	solveOdometry(vip, floor_detected()); 
-
+	if(!mbStill)
+	{
+	    // remove outliers
+	    removeOutliers(vip);
+	    // solve it angin 
+	    solveOdometry(vip, floor_detected()); 
+	}
 	// slide for next loop 
 	slideWindow(); 
     }
@@ -322,7 +323,7 @@ void VIO::removeWrongTri(vector<ip_M>& ipRelations)
         ip_M& m = tmp[i];
         if(m.v == ip_M::DEPTH_TRI)
         {
-            if(m.s < 3.1)
+            if(m.s < 3.1) // since the depth of points < 3.1 shoud be directly measured
                 m.v = ip_M::INVALID;
         }
     }
@@ -515,6 +516,13 @@ void VIO::solveOdometry(vector<ip_M>& vip, bool use_floor_plane)
     if(ESTIMATE_EXTRINSIC == 0)
 	   problem.SetParameterBlockConstant(para_Ex_Pose[0]); 
     }
+    
+    if(mbStill)
+    {
+	Ps[WN] = Ps[WN-1]; 
+	Vs[WN] = Vs[WN-1];
+	Rs[WN] = Rs[WN-1]; 
+    }
 
     priorOptimize(vip); 
 
@@ -530,39 +538,44 @@ void VIO::solveOdometry(vector<ip_M>& vip, bool use_floor_plane)
     // cout<<"IMU factor covariance: "<<endl<<imu_factor->pre_integration->covariance<<endl;
 	problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
     }
-    
-    // add plane factor 
-    if(use_floor_plane)
+    if(!mbStill) // motion
     {
-	// cout<<"vio.cpp: add plane_factor with plane_g: "<<Pls[0].transpose()<<" plane_l: "<<Pls[1].transpose()<<endl;
-	PlaneFactor_P1 * plane_factor = new PlaneFactor_P1(Pls[0], Pls[1]); 
-	problem.AddResidualBlock(plane_factor, NULL, para_Pose[1]);
-    }
-    
-    // add feature factor 
-    const float INIT_DIS = 10; 
-    int N = vip.size(); 
-    for(int i=0; i<N; i++)
-    {
-	ip_M& pt = vip[i]; 
-	Eigen::Vector3d p1(pt.ui, pt.vi, 1.); 
-	Eigen::Vector3d p2(pt.uj, pt.vj, 1.); 
-	if(pt.v == ip_M::NO_DEPTH)
+	// add plane factor 
+	if(use_floor_plane)
 	{
-	    para_Feature[i][0] = 1./INIT_DIS; 
-	    ProjectionFactor_Y2 * f= new ProjectionFactor_Y2(p1, p2); 
-	    problem.AddResidualBlock(f, loss_function, para_Pose[0], para_Pose[1], para_Ex_Pose[0], para_Feature[i]); 
-	}else if(pt.v == ip_M::DEPTH_MES || pt.v == ip_M::DEPTH_TRI)
+	    // cout<<"vio.cpp: add plane_factor with plane_g: "<<Pls[0].transpose()<<" plane_l: "<<Pls[1].transpose()<<endl;
+	    PlaneFactor_P1 * plane_factor = new PlaneFactor_P1(Pls[0], Pls[1]); 
+	    problem.AddResidualBlock(plane_factor, NULL, para_Pose[1]);
+	}
+
+	// add feature factor 
+	const float INIT_DIS = 10; 
+	int N = vip.size(); 
+	for(int i=0; i<N; i++)
 	{
-	    para_Feature[i][0] = 1./pt.s; 
-	    ProjectionFactor * f = new ProjectionFactor(p1, p2); 
-	    f->sqrt_info = 240 * Eigen::Matrix2d::Identity(); 
-	    problem.AddResidualBlock(f, loss_function, para_Pose[0], para_Pose[1], para_Ex_Pose[0], para_Feature[i]);
-	    if(pt.v == ip_M::DEPTH_MES)
+	    ip_M& pt = vip[i]; 
+	    Eigen::Vector3d p1(pt.ui, pt.vi, 1.); 
+	    Eigen::Vector3d p2(pt.uj, pt.vj, 1.); 
+	    if(pt.v == ip_M::NO_DEPTH)
+	    {
+		para_Feature[i][0] = 1./INIT_DIS; 
+		ProjectionFactor_Y2 * f= new ProjectionFactor_Y2(p1, p2); 
+		problem.AddResidualBlock(f, loss_function, para_Pose[0], para_Pose[1], para_Ex_Pose[0], para_Feature[i]); 
+	    }else if(pt.v == ip_M::DEPTH_MES || pt.v == ip_M::DEPTH_TRI)
+	    {
+		para_Feature[i][0] = 1./pt.s; 
+		ProjectionFactor * f = new ProjectionFactor(p1, p2); 
+		f->sqrt_info = 240 * Eigen::Matrix2d::Identity(); 
+		problem.AddResidualBlock(f, loss_function, para_Pose[0], para_Pose[1], para_Ex_Pose[0], para_Feature[i]);
+		if(pt.v == ip_M::DEPTH_MES)
 		    problem.SetParameterBlockConstant(para_Feature[i]);
-	}	
-    }   
-    
+	    }	
+	}   
+    }else // camera kept still, no motion 
+    {
+	// fix the last pose 
+	problem.SetParameterBlockConstant(para_Pose[WN]);
+    }
     // optimize it 
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_SCHUR;
@@ -858,6 +871,8 @@ void VIO::associateFeatures(vector<ip_M>& vip)
     int cnt_depth_mes = 0; 
     int cnt_depth_tri = 0; 
     int cnt_not_matched = 0; 
+    double disparity = 0; 
+    // static ofstream fdis("disparity.log"); 
     for(int i=0; i<imgPTLastNum; i++)
     {
 	bool ipFound = false; 
@@ -880,6 +895,9 @@ void VIO::associateFeatures(vector<ip_M>& vip)
 	    ipr.vi = mImgPTLast->points[i].v; 
 	    ipr.uj = mImgPTCurr->points[j].u; 
 	    ipr.vj = mImgPTCurr->points[j].v; 
+	    
+	    disparity += sqrt(SQ(ipr.ui - ipr.uj) + SQ(ipr.vi - ipr.vj)); 
+
 	    ipr.ind = mImgPTCurr->points[j].ind;
 
 	    ips.x = mZoomDis * ipr.ui; 
@@ -1009,6 +1027,19 @@ void VIO::associateFeatures(vector<ip_M>& vip)
     }
     vip = ipRelations; 
     ROS_DEBUG("vio.cpp: total %d no matches %d matches %d, no_depth: %d depth_with_meas: %d depth_with_tri: %d",imgPTLastNum, cnt_not_matched, cnt_matched, cnt_no_depth, cnt_depth_mes, cnt_depth_tri);
+    // fdis << std::fixed<<disparity<<endl; 
+    
+    mbStill = false; 
+
+    if(cnt_matched > 10)
+    {
+	disparity /= (double)(cnt_matched); 
+	if(disparity < 0.002)
+	{
+	    ROS_WARN("vio: still cnt_matched: %d mean disparity: %lf < 0.002", cnt_matched, disparity); 
+	    mbStill = true; 
+	}
+    }
 }
 
 
