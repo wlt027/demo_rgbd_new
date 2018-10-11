@@ -132,6 +132,7 @@ public:
     Eigen::Matrix3d Rs[WN+1]; 
     Eigen::Vector3d Bas[WN+1]; 
     Eigen::Vector3d Bgs[WN+1]; 
+    Eigen::Matrix3d R_imu; 
 
     Eigen::Matrix<double, 4, 1> Pls[WN+1]; // planes 
     volatile bool mbFirstFloorObserved; 

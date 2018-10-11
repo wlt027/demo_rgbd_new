@@ -65,6 +65,8 @@ void VIO::clearState()
 	    delete pre_integrations[i]; 
 	pre_integrations[i] = NULL; 
     }
+    
+    R_imu = Eigen::Matrix3d::Identity(); 
 
  //    if(tmp_pre_integration != NULL)
 	// delete tmp_pre_integration; 
@@ -98,6 +100,7 @@ void VIO::processIMU(double dt, Vector3d & linear_acceleration, Vector3d& angula
 	Vector3d un_acc_0 = Rs[j] * (acc_0 - Bas[j]) - mg; 
 	Vector3d un_gyr = 0.5 *(gyr_0 + angular_velocity) - Bgs[j]; 
 	Rs[j] *= Utility::deltaQ(un_gyr * dt).toRotationMatrix(); 
+	R_imu *= Utility::deltaQ(un_gyr * dt).toRotationMatrix(); 
 	Vector3d un_acc_1 = Rs[j] * (linear_acceleration - Bas[j]) - mg;
 	Vector3d un_acc = 0.5 *(un_acc_0 + un_acc_1); 
 	Ps[j] += dt * Vs[j] + 0.5 * dt * dt * un_acc; 
