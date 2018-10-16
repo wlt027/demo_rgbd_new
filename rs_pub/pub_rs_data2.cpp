@@ -18,7 +18,13 @@
 #include <ros/ros.h>
 
 #include <sensor_msgs/image_encodings.h>  
+#include <sensor_msgs/PointCloud2.h>
 #include <std_msgs/String.h>  
+
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/ros/conversions.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
 
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/Image.h>
@@ -35,6 +41,10 @@ using namespace cv ;
 
 ros::Publisher rgb_pub; 
 ros::Publisher dpt_pub; 
+
+bool b_publish_pc = false; 
+ros::Publisher pc_pub; 
+double fx, fy, cx, cy; 
 
 void publishRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgAD);
 
@@ -61,6 +71,18 @@ int main(int argc, char* argv[])
 
   int q = 7; 
 
+  np.param("publish_point_cloud", b_publish_pc, b_publish_pc); 
+  if(b_publish_pc)
+  {
+  	pc_pub = nh.advertise<sensor_msgs::PointCloud2>("/depth_cloud", q); 
+  	np.param("fx", fx, 617.31); 
+	np.param("fy", fy, 617.71); 
+	np.param("cx", cx, 326.24); 
+	np.param("cy", cy, 239.97); 
+	ROS_WARN("publish_pc: given fx = %f fy = %f cx = %f cy = %f", fx, fy, cx, cy); 
+  }
+
+
   rgb_pub = nh.advertise<sensor_msgs::Image>("/cam0/color", q); 
   dpt_pub = nh.advertise<sensor_msgs::Image>("/cam0/depth", q);
 
@@ -76,6 +98,62 @@ int main(int argc, char* argv[])
   return 0;
 }
 
+void processCloud(const sensor_msgs::Image::ConstPtr& dpt_img_msg)
+{   
+     pcl::PointCloud<pcl::PointXYZ>::Ptr tmpPC(new pcl::PointCloud<pcl::PointXYZ>); 
+     cv::Mat dpt_img = cv_bridge::toCvCopy(dpt_img_msg)->image; 
+     cv::Mat dst; 
+     cv::medianBlur(dpt_img, dst, 5); 
+     dpt_img = dst; 
+
+     float scale = 0.001; 
+     float max_dis = 3.; 
+     float min_dis = 0.3; 
+     float ds = 5; 
+     float half_ds =ds/2. - 0.5; 
+     for(double i=half_ds; i < dpt_img.rows; i+= ds)
+     for(double j=half_ds; j < dpt_img.cols; j+= ds)
+     {
+     	int pixCnt = 0; 
+	float vd, vd_sum = 0; 
+	int is = (int)(i-half_ds); int ie = (int)(i+half_ds); 
+	int js = (int)(j-half_ds); int je = (int)(j+half_ds); 
+	for(int ii=is; ii<=ie; ii++)
+	for(int jj=js; jj<=je; jj++)
+	{
+	    unsigned short _dpt = dpt_img.at<unsigned short>(ii, jj); 
+	    vd = _dpt * scale; 
+	    if(vd <= max_dis && vd >= min_dis)
+	    {
+	    	vd_sum += vd; 
+		++pixCnt; 
+	    }
+	}
+
+	if(pixCnt > 0)
+	{
+	    double u = (j-cx)/fx; 
+	    double v = (i-cy)/fy;
+	    double mean_vd = vd_sum/pixCnt; 
+	    pcl::PointXYZ pt; 
+	    pt.x = u * mean_vd; 
+	    pt.y = v * mean_vd; 
+	    pt.z = mean_vd; 
+	    tmpPC->points.push_back(pt);
+	}
+     }
+     tmpPC->width = tmpPC->points.size(); 
+     tmpPC->height = 1; 
+     tmpPC->is_dense = true; 
+     
+     // publish it
+     sensor_msgs::PointCloud2 depthCloud2; 
+     pcl::toROSMsg(*tmpPC, depthCloud2); 
+     depthCloud2.header.frame_id = "map"; 
+     depthCloud2.header.stamp = dpt_img_msg->header.stamp; 
+     pc_pub.publish(depthCloud2); 
+     return ; 
+}
 
 void process()
 {
@@ -92,7 +170,14 @@ void process()
 	    sensor_msgs::ImageConstPtr rgb_ptr = m[i].first; 
 	    sensor_msgs::ImageConstPtr dpt_ptr = m[i].second; 
 	    publishRGBD(rgb_ptr, dpt_ptr); 	
+	    if(b_publish_pc && i==m.size()-1)
+	    {
+	    	processCloud(dpt_ptr); 
+	    }
+	    ros::spinOnce(); 
 	}
+	
+
     }
 }
 
