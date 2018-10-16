@@ -66,6 +66,27 @@ mCloudPub(new pcl::PointCloud<pcl::PointXYZI>())
 // template<int CLOUD_NUM>
 DepthHandler::~DepthHandler(){}
 
+bool DepthHandler::readParam(string config_file)
+{
+    cv::FileStorage fsSettings(config_file, cv::FileStorage::READ);
+    if(!fsSettings.isOpened())
+    {
+        std::cerr << "depth_handler: ERROR: Wrong path to settings" << std::endl;
+	 return false; 
+    }
+   cv::FileNode n = fsSettings["projection_parameters"]; 
+   mk[0] = static_cast<double>(n["fx"]); 
+   mk[1] = static_cast<double>(n["fy"]); 
+   mk[2] = static_cast<double>(n["cx"]);
+   mk[3] = static_cast<double>(n["cy"]);
+
+   mCloudDSRate = fsSettings["cloud_ds_rate"]; 
+   
+   fsSettings.release(); 
+   return true; 
+}
+
+
 void DepthHandler::cloudHandler2(const sensor_msgs::Image::ConstPtr& dpt_img_msg)
 {
     mCloudCnt = (mCloudCnt+1)%(mCloudSkip+1); 
@@ -84,7 +105,7 @@ void DepthHandler::cloudHandler2(const sensor_msgs::Image::ConstPtr& dpt_img_msg
     // median filter to get rid some noise 
     cv::Mat dpt_img = cv_bridge::toCvCopy(dpt_img_msg)->image;
     cv::Mat dst; 
-    cv::medianBlur(dpt_img, dst, 5 );  
+    cv::medianBlur(dpt_img, dst, 5);  
     dpt_img = dst; 
 
     // 
@@ -306,14 +327,14 @@ void DepthHandler::voDataHandler(const nav_msgs::Odometry::ConstPtr& vo_trans)
     downSizeFilter.setLeafSize(0.1, 0.1, 0.1);
     downSizeFilter.filter(*mCloudPub);
     int tempCloud2Num = mCloudPub->points.size();
-
+/*
     for(int i=0; i<tempCloud2Num; i++)
     {
 	mCloudPub->points[i].z = mCloudPub->points[i].intensity;
 	mCloudPub->points[i].x = mCloudPub->points[i].x * mCloudPub->points[i].z / mZoomDis; 
 	mCloudPub->points[i].y = mCloudPub->points[i].y * mCloudPub->points[i].z / mZoomDis; 
 	mCloudPub->points[i].intensity = mZoomDis;
-    }
+    }*/
     mTimeRec = time; 
     mLastPose = currPose; 
     // cout <<"DP: after downsample again depth cloud has "<<tempCloud2Num<<" points to publish "<<endl;

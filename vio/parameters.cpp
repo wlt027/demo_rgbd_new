@@ -64,6 +64,7 @@ void readParameters(ros::NodeHandle &n)
     SOLVER_TIME = fsSettings["max_solver_time"];
     NUM_ITERATIONS = fsSettings["max_num_iterations"];
     MIN_PARALLAX = fsSettings["keyframe_parallax"];
+    // FOCAL_LENGTH = fsSettings["virtual_focal_length"];
     MIN_PARALLAX = MIN_PARALLAX / FOCAL_LENGTH;
 
     fsSettings["output_path"] >> VINS_RESULT_PATH;
@@ -138,7 +139,7 @@ void readParameters(ros::NodeHandle &n)
     }
 
 
-    INIT_DEPTH =  15.0; // 15.0; // 5.0;
+    INIT_DEPTH =  7.0; // 15.0; // 5.0;
     BIAS_ACC_THRESHOLD = 0.1;
     BIAS_GYR_THRESHOLD = 0.1;
     MAX_KEYFRAME_NUM = 1000;

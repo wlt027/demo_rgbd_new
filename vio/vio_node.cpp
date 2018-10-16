@@ -131,12 +131,12 @@ void send_imu(const sensor_msgs::ImuConstPtr &imu_msg)
 
     // test IMU's rotation 
     tfScalar y, p, r; 
-    getEulerYPR(vio.R_imu, y, p, r); 
+    // getEulerYPR(vio.R_imu, y, p, r); 
     std_msgs::Float32MultiArray msg; 
     msg.data.resize(3); 
     msg.data[0] = r; msg.data[1] = p; msg.data[2] = y; 
-    imuEulerPubPointer->publish(msg); 
-    ROS_DEBUG("vio_node: publish roll: %f pitch: %f yaw: %f", R2D(r), R2D(p), R2D(y)); 
+    // imuEulerPubPointer->publish(msg); 
+   // ROS_DEBUG("vio_node: publish roll: %f pitch: %f yaw: %f", R2D(r), R2D(p), R2D(y)); 
 }
 
 std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloud2ConstPtr>>
@@ -267,6 +267,7 @@ void process()
 	    ROS_WARN("vio_node.cpp: average vo cost %f ms", sum_vo_t/(++sum_vo_cnt));
 
         publishMsg(img_msg); 
+	 ros::spinOnce();
 	}
     }
 }
@@ -323,7 +324,8 @@ void publishMsg(sensor_msgs::PointCloud2ConstPtr& img_msg)
         vioDataPubPointer->publish(vioData);
         cout <<"vio publish: vio t "<<t.getX()<<" "<<t.getY() <<" "<<t.getZ()<<endl;
         cout <<"vio publish: vio q "<< q.getX()<<" "<< q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl;
-
+        ros::spinOnce();
+	
         {
         // broadcast voTrans imu -> camera 
         tf::StampedTransform voTrans;
@@ -423,7 +425,8 @@ void imageDataHandler(const sensor_msgs::Image::ConstPtr& imageData)
     cv::Mat show_img = ptr->image; 
 
     // double kImage[9] = {525.0, 0.0, 319.5, 0.0, 525.0, 239.5, 0.0, 0.0, 1.0};
-    double kImage[9] = {617.306, 0.0, 326.245, 0.0, 617.714, 239.974, 0.0, 0.0, 1.0};
+    // double kImage[9] = {617.306, 0.0, 326.245, 0.0, 617.714, 239.974, 0.0, 0.0, 1.0};
+    double kImage[9] = {FX, 0.0, CX, 0.0, FY, CY, 0.0, 0.0, 1.0};
     double showDSRate = 2.;
     vector<ip_M> ipRelations = vio.mPtRelations; 
     int ipRelationsNum = ipRelations.size();

@@ -35,6 +35,7 @@ mImgPTLast(new pcl::PointCloud<ImagePoint>),
 mImgPTCurr(new pcl::PointCloud<ImagePoint>),
 mPCTime(0),
 mPC(new pcl::PointCloud<pcl::PointXYZI>),
+mCurrSinglePC(new pcl::PointCloud<pcl::PointXYZI>),
 mKDTree(new pcl::KdTreeFLANN<pcl::PointXYZI>),
 mZoomDis(10.),
 mdisThresholdForTriangulation(1.), // 1.
@@ -151,6 +152,7 @@ void VIO::processDepthCloud(sensor_msgs::PointCloud2ConstPtr& depthCloud2)
     pcl::fromROSMsg(*depthCloud2, *tmpPC); 
     int depthCloudNum = tmpPC->points.size(); 
     // cout <<"vo receive "<<std::fixed<< mPCTime<<" dpt has: "<<depthCloudNum<<" points!"<<endl;
+    /*
     if(depthCloudNum > 20)
     {
 	for(int i=0; i<depthCloudNum; i++)
@@ -161,11 +163,12 @@ void VIO::processDepthCloud(sensor_msgs::PointCloud2ConstPtr& depthCloud2)
 	    tmpPC->points[i].z = mZoomDis;
 	} 
 	// mKDTree->setInputCloud(mPC); 
-    }
+    }*/
     m_pc_buf.lock(); 
 	pctime_buf.push(pctime); 
 	pc_buf.push(tmpPC);
     m_pc_buf.unlock(); 
+    con.notify_one();
 }
 
 void VIO::processImage(sensor_msgs::PointCloud2ConstPtr& imagePoints2)
@@ -197,15 +200,15 @@ void VIO::processImage(sensor_msgs::PointCloud2ConstPtr& imagePoints2)
 	removeWrongTri(vip); 
 
 	// solve odometry 
-	solveOdometry(vip); 
-
+	solveOdometry(vip, floor_detected()); 
+/*
 	if(!mbStill)
 	{
 	    // remove outliers
 	    removeOutliers(vip);
 	    // solve it angin 
 	    solveOdometry(vip, floor_detected()); 
-	}
+	}*/
 	// slide for next loop 
 	slideWindow(); 
     }
@@ -236,6 +239,7 @@ bool VIO::floor_detected()
         {
             ROS_DEBUG("vio.cpp: succeed set current pointcloud at t = %lf", mTimeCurr);
             tmp_pc = curr_pc_buf.front();
+	     mCurrSinglePC = tmp_pc;
             curr_pctime_buf.pop(); 
             curr_pc_buf.pop(); 
             break;
@@ -459,16 +463,19 @@ void VIO::prepareForDisplay(vector<ip_M>& ipRelations)
     {
 	// transform to world coordinate 
 	pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
-	tmp->points.resize(mPC->points.size()); 
-	for(int i=0; i<mPC->points.size(); i++)
+	if(!b_use_curr_single_pc)
 	{
-	    pcl::PointXYZI& pt = mPC->points[i]; 
-	    tf::Vector3 pj(pt.x/mZoomDis*pt.intensity, pt.y/mZoomDis*pt.intensity, pt.intensity); 
-	    tf::Vector3 pi = mLastPose * pj; 
-	    pcl::PointXYZ ptw(pi.getX(), pi.getY(), pi.getZ());
-	    tmp->points[i] = ptw; 
+	     tmp->points.resize(mPC->points.size()); 
+	     for(int i=0; i<mPC->points.size(); i++)
+		{
+	   	pcl::PointXYZI& pt = mPC->points[i]; 
+	    	tf::Vector3 pj(pt.x/mZoomDis*pt.intensity, pt.y/mZoomDis*pt.intensity, pt.intensity); 
+	    	tf::Vector3 pi = mLastPose * pj; 
+	    	pcl::PointXYZ ptw(pi.getX(), pi.getY(), pi.getZ());
+	    	tmp->points[i] = ptw; 
+		}
 	}
-	// remove floor 
+		// remove floor 
 	removeFloorPts(tmp, mPCNoFloor); 
     }
 
@@ -816,10 +823,30 @@ void VIO::prepareNextLoop()
     mvDptLast.clear();
     return ; 
 }
+/*
+void VIO::setPointCloudAt(double t)
+{
+  boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> > tmpPC(new pcl::PointCloud<pcl::PointXYZI>()); 
+    // mPC->clear(); 
+    mPC.swap(tmpPC);
+    b_use_curr_single_pc = false;
+    mPC = mCurrSinglePC->makeShared(); 
+    ROS_DEBUG("vio.cpp: mPC has %d points", mPC->points.size());
+    if(!mPC->empty())
+    {
+		mKDTree->setInputCloud(mPC);
+		b_use_curr_single_pc = true;
+    }
+    return ; 
+}*/
+	
 
 void VIO::setPointCloudAt(double t)
 {
-    mPC->clear(); 
+    boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> > tmpPC(new pcl::PointCloud<pcl::PointXYZI>()); 
+    // mPC->clear(); 
+    mPC.swap(tmpPC);
+    b_use_curr_single_pc = false;
     m_pc_buf.lock(); 
 	while(!pctime_buf.empty())
 	{
@@ -839,12 +866,72 @@ void VIO::setPointCloudAt(double t)
 		pc_buf.pop(); 
 		break;
 	    }else{ // tmp > t
-		ROS_WARN("vio.cpp: no point cloud available for t= %lf", t);
+		ROS_ERROR("vio.cpp: no point cloud available for t= %lf, use previous PC", t);
+		mPC.swap(tmpPC);
 		break; 
 	    }
 	}
     m_pc_buf.unlock(); 
+    
+	
+    if(mPC->empty())
+    {
+	 ROS_INFO("vio.cpp: no point cloud available for t= %lf, use currentPC", t);
+	 // mPC = mCurrSinglePC->makeShared(); 
+	 
+	 int depthCloudNum = mCurrSinglePC->points.size(); 
+	 if(depthCloudNum > 20)
+        {
+        	mPC->points.resize(depthCloudNum); 
+		for(int i=0; i<depthCloudNum; i++)
+	 	{
+	     		mPC->points[i].x = mCurrSinglePC->points[i].x * mZoomDis / mCurrSinglePC->points[i].z;
+	     		mPC->points[i].y = mCurrSinglePC->points[i].y * mZoomDis / mCurrSinglePC->points[i].z;
+	     		mPC->points[i].intensity = mCurrSinglePC->points[i].z; 
+	     		mPC->points[i].z = mZoomDis;
+	 	} 
+	 }
+	 ROS_DEBUG("vio.cpp: mPC has %d points", mPC->points.size());
+	 if(!mPC->empty())
+	 {
+		mKDTree->setInputCloud(mPC);
+		b_use_curr_single_pc = true;
+	 }
+	else{
+		
+	ROS_ERROR("vio.cpp: no point cloud available for t= %f, wait for it", t); 
+	// mPC.swap(tmpPC); 
+	// mKDTree->setInputCloud(mPC);
+	// wait for the depth cloud 
+	 std::unique_lock<std::mutex> lk(m_pc_buf);
+        con.wait(lk, [&]
+                 {
+                 while(!pctime_buf.empty())
+		  {
+                    double tmp = pctime_buf.front(); 
+		     if(tmp == t)
+		     {
+			 mPC = pc_buf.front(); 
+			 mKDTree->setInputCloud(mPC);
+			 ROS_DEBUG("vio.cpp: get depth cloud at t = %f", t);
+			 break; 
+		      }
+		     if(tmp > t)
+		     {
+			 ROS_ERROR("vio.cpp: no depth cloud for t = %lf, use previous depth cloud", t); 
+			 mPC.swap(tmpPC);
+			 break; 
+		      }
+		   	pctime_buf.pop();
+		       pc_buf.pop();
+                 }
+            	  return (!mPC->empty());
+                 });
+        lk.unlock();
+		}
+    }
 }
+
 
 void VIO::associateFeatures(vector<ip_M>& vip)
 {
@@ -1034,7 +1121,7 @@ void VIO::associateFeatures(vector<ip_M>& vip)
     
     mbStill = false; 
 
-    if(cnt_matched > 10)
+    if(cnt_matched > 3)
     {
 	disparity /= (double)(cnt_matched); 
 	if(disparity < 0.002)
@@ -1048,10 +1135,10 @@ void VIO::associateFeatures(vector<ip_M>& vip)
 
 void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in, boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> >& out)
 {
-    TicToc t_fz; 
+    TicToc t_fz;
+    out->points.clear();
     if(in->points.size() < 100)
 	return ; 
-    out->points.clear();
 
     double min_z, max_z; 
 

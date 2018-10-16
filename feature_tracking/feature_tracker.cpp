@@ -9,6 +9,7 @@
 #include "../utility/tic_toc.h"
 #include <Eigen/Core>
 #include <ros/ros.h>
+#include <iostream>
 
 #define SQ(x) ((x)*(x))
 
@@ -50,6 +51,71 @@ void CTrackerParam::defaultInit()
     
     mHarrisThreshold = 1e-8; // 1e-6; // 1e-6;    
     mMinDist = 20.0;
+}
+
+bool CTrackerParam::readParam(string filename)
+{
+    cv::FileStorage fsSettings(filename, cv::FileStorage::READ);
+    if(!fsSettings.isOpened())
+    {
+        std::cerr << "feature_tracker: ERROR: Wrong path to settings" << std::endl;
+	 return false; 
+    }
+
+   mXSubregionNum = fsSettings["sub_region_x"];
+   mYSubregionNum = fsSettings["sub_region_y"]; 
+   mTotalSubregionNum = mXSubregionNum * mYSubregionNum; 
+
+   mMaxFeatureNumInSubregion = fsSettings["max_n_feature_subregion"]; 
+   mMaxFeatureNum = mMaxFeatureNumInSubregion * mTotalSubregionNum; 
+
+   mXBoundary = fsSettings["boundary_x"]; 
+   mYBoundary = fsSettings["boundary_y"]; 
+
+   cv::FileNode n = fsSettings["projection_parameters"]; 
+   mfx = static_cast<double>(n["fx"]); 
+   mfy = static_cast<double>(n["fy"]); 
+   mcx = static_cast<double>(n["cx"]);
+   mcy = static_cast<double>(n["cy"]);
+
+   n = fsSettings["distortion_parameters"]; 
+   mk[0] = static_cast<double>(n["k1"]); 
+   mk[1] = static_cast<double>(n["k2"]); 
+   mp[0] = static_cast<double>(n["p1"]); 
+   mp[1] = static_cast<double>(n["p2"]); 
+   mWidth = fsSettings["image_width"]; 
+   mHeight = fsSettings["image_height"]; 
+   mMinDist = fsSettings["min_dist_between_features"]; 
+   mHarrisThreshold = fsSettings["harris_threshold"]; 
+
+   int show_result = fsSettings["show_feature_tracking_result"];
+   mbShowTrackedResult = (show_result != 0);
+    mSubregionWidth = (double)(mWidth - 2*mXBoundary) / (double)(mXSubregionNum); 
+    mSubregionHeight = (double) (mHeight - 2*mYBoundary) / (double)(mYSubregionNum); 
+    
+   fsSettings.release();
+   return true;
+
+}
+
+void CTrackerParam::printParam()
+{
+	
+	cout<<"print TrackParam: "<<endl; 
+	cout<<"image width: "<<mWidth<<"height: "<<mHeight<<endl; 
+	cout<<"fx = "<<mfx<<" fy = "<<mfy<<" cx = "<<mcx<<" cy = "<<mcy<<endl; 
+	cout<<"k1 = "<<mk[0]<<" k2 = "<<mk[1]<<" p1= "<<mp[0]<<" p2 = "<<mp[1]<<endl; 
+	cout<<"subregion_x= "<<mXSubregionNum<<" subregion_y= "<<mYSubregionNum<<endl;
+	cout<<"boundary_x= "<<mXBoundary<<" boundary_y =  "<<mYBoundary<<endl; 
+	cout<<"min_dist_between_features= "<<mMinDist<<" harris_threshold = "<<mHarrisThreshold<<endl;
+} 
+
+
+bool CFeatureTracker::readParam(string filename)
+{  
+   bool ret =  mParam.readParam(filename);  
+   if(ret) init(); 
+   return ret; 
 }
 
 CFeatureTracker::CFeatureTracker()

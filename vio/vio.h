@@ -17,6 +17,7 @@
 #include <unordered_map>
 #include <queue>
 #include <mutex>
+#include <condition_variable>
 #include <opencv2/core/eigen.hpp>
 #include <sensor_msgs/PointCloud2.h>
 #include "../utility/pointDefinition.h"
@@ -89,13 +90,15 @@ public:
     boost::shared_ptr<pcl::PointCloud<ImagePoint> > mImgPTLast; 
     
     double mPCTime; // point cloud time 
-    boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> > mPC; 
+    bool b_use_curr_single_pc; 
+    boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> > mPC;
+    boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> > mCurrSinglePC; // current frame's depth data
     boost::shared_ptr<pcl::KdTreeFLANN<pcl::PointXYZI> > mKDTree; 
     
     queue<double> pctime_buf; 
     queue<boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> > > pc_buf;
     std::mutex m_pc_buf;
-    
+    std::condition_variable con;
 
     double mZoomDis; // must equal to that in depth_handler 
     vector<float>  mvDptCurr; 

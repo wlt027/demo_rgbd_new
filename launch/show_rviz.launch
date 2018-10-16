@@ -1,0 +1,5 @@
+<launch>
+
+  <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find demo_rgbd_new)/launch/vio_laser.rviz"/>
+
+</launch>

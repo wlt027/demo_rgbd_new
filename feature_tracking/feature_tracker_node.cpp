@@ -15,12 +15,16 @@ CFeatureTracker feat_tracker(track_param);
 ros::Publisher *imagePointsLastPubPointer;
 ros::Publisher *imageShowPubPointer;
 
+int pub_count = 0;
+double first_pub_time = 0; 
+
 void imgCallback(const sensor_msgs::Image::ConstPtr& imageData);
 
 int main(int argc, char* argv[]) 
 {
     ros::init(argc, argv, "feature_tracking");
     ros::NodeHandle nh;
+    ros::NodeHandle np("~"); 
     // ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
 
@@ -35,6 +39,14 @@ int main(int argc, char* argv[])
     
     ros::Publisher imageShowPub = nh.advertise<sensor_msgs::Image>("/image/show", 1);
     imageShowPubPointer = &imageShowPub;
+
+    string param_file(""); 
+    np.param("config_file", param_file, param_file); 
+    if(param_file != "")
+    { 
+	feat_tracker.readParam(param_file);
+	feat_tracker.mParam.printParam();
+    }
 
     ros::spin();
 
@@ -66,7 +78,10 @@ void imgCallback(const sensor_msgs::Image::ConstPtr& _img)
 	
 	imagePointsLastPubPointer->publish(imagePointsLast2); 
 	// cout <<"feature_track_node: msg at" <<std::fixed<<imagePointsLast2.header.stamp.toSec()<<" first and last pt: "<<imagePointsLast->points[0].u<<" "<<imagePointsLast->points[imagePointsLast->points.size()-1].u<<" "<<imagePointsLast->points[imagePointsLast->points.size()-1].v<<endl;
-    
+
+	// ROS_WARN("Feature_tracking: publish %d at fps %f", ++pub_count, 1.*pub_count/(img_time-first_pub_time));
+
+	
 	// show img 
 	if(feat_tracker.mbSendImgForShow)
 	{
@@ -75,6 +90,9 @@ void imgCallback(const sensor_msgs::Image::ConstPtr& _img)
 	    bridge.encoding = "mono8"; 
 	    imageShowPubPointer->publish(bridge.toImageMsg()); 
 	}
+    }else
+    {
+	first_pub_time = img_time; 
     }
 }
 

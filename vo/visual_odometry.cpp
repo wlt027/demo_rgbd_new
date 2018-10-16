@@ -518,14 +518,14 @@ void VisualOdometry::depthCloudHandler(const sensor_msgs::PointCloud2ConstPtr& d
     int depthCloudNum = mPC->points.size(); 
     cout <<"vo receive "<<std::fixed<< mPCTime<<" dpt has: "<<depthCloudNum<<" points!"<<endl;
     if(depthCloudNum > 20)
-    {
+    {/*
 	for(int i=0; i<depthCloudNum; i++)
 	{
 	    mPC->points[i].x = mPC->points[i].x * mZoomDis / mPC->points[i].z;
 	    mPC->points[i].y = mPC->points[i].y * mZoomDis / mPC->points[i].z;
 	    mPC->points[i].intensity = mPC->points[i].z; 
 	    mPC->points[i].z = mZoomDis;
-	} 
+	} */
 	mKDTree->setInputCloud(mPC); 
     }
 }
