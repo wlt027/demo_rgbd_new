@@ -360,6 +360,8 @@ void publishMsg(sensor_msgs::PointCloud2ConstPtr& img_msg)
             // publish obstacle point 
             sensor_msgs::PointCloud2 obstaclePC2;
             pcl::toROSMsg(*(vio.mPCNoFloor), obstaclePC2);
+	    // ROS_INFO("vio: mPCNoFloor has %d points, width: %d height: %d, obstacle width: %d height: %d", vio.mPCNoFloor->points.size(), 
+	    // 	vio.mPCNoFloor->width, vio.mPCNoFloor->height, obstaclePC2.width, obstaclePC2.height); 
             obstaclePC2.header.frame_id = "world";
             obstaclePC2.header.stamp = ros::Time().fromSec(vio.mTimeLast);
             obstaclePCPubPointer->publish(obstaclePC2);    

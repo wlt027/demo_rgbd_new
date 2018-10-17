@@ -475,8 +475,10 @@ void VIO::prepareForDisplay(vector<ip_M>& ipRelations)
 	    	tmp->points[i] = ptw; 
 		}
 	}
-		// remove floor 
+	// remove floor 
 	removeFloorPts(tmp, mPCNoFloor); 
+	// if(mPCNoFloor->points.size() == 0)
+	   // ROS_ERROR("vio: mPCNoFloor has zero points!!"); 
     }
 
     // save this for displaying 
@@ -1137,6 +1139,8 @@ void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in,
 {
     TicToc t_fz;
     out->points.clear();
+    out->width = 0; 
+    out->height = 0; 
     if(in->points.size() < 100)
 	return ; 
 
