@@ -845,6 +845,7 @@ void VIO::setPointCloudAt(double t)
 
 void VIO::setPointCloudAt(double t)
 {
+    static bool once = true; // handle the case when no depth data is available in the beginning 
     boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> > tmpPC(new pcl::PointCloud<pcl::PointXYZI>()); 
     // mPC->clear(); 
     mPC.swap(tmpPC);
@@ -898,13 +899,16 @@ void VIO::setPointCloudAt(double t)
 	 {
 		mKDTree->setInputCloud(mPC);
 		b_use_curr_single_pc = true;
+		once = false; 
 	 }
 	else{
 		
-	ROS_ERROR("vio.cpp: no point cloud available for t= %f, wait for it", t); 
 	// mPC.swap(tmpPC); 
 	// mKDTree->setInputCloud(mPC);
 	// wait for the depth cloud 
+	if(once == false)
+	{
+	 ROS_ERROR("vio.cpp: no point cloud available for t= %f, wait for it", t); 
 	 std::unique_lock<std::mutex> lk(m_pc_buf);
         con.wait(lk, [&]
                  {
@@ -930,7 +934,10 @@ void VIO::setPointCloudAt(double t)
             	  return (!mPC->empty());
                  });
         lk.unlock();
-		}
+	}
+	}
+    }else{
+    	once = false; 
     }
 }
 
