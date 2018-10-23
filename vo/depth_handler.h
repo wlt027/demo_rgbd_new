@@ -14,9 +14,12 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <tf/tf.h>
+#include <string>
+
+using namespace std;
 
 // template<int CLOUD_NUM>
-const static int CLOUD_NUM = 5;
+const static int CLOUD_NUM = 3; // 5 
 class DepthHandler
 {
 public:
@@ -27,6 +30,7 @@ public:
     void cloudHandler3(const sensor_msgs::PointCloud2ConstPtr& depthCloud2);
 
     void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData);
+    bool readParam(string config_file);
 
     int mCloudCnt; 	// number of cloud 
     int mCloudSkip; 	// number of frames be skipped

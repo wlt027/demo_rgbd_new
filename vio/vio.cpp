@@ -35,6 +35,7 @@ mImgPTLast(new pcl::PointCloud<ImagePoint>),
 mImgPTCurr(new pcl::PointCloud<ImagePoint>),
 mPCTime(0),
 mPC(new pcl::PointCloud<pcl::PointXYZI>),
+mCurrSinglePC(new pcl::PointCloud<pcl::PointXYZI>),
 mKDTree(new pcl::KdTreeFLANN<pcl::PointXYZI>),
 mZoomDis(10.),
 mdisThresholdForTriangulation(1.), // 1.
@@ -65,6 +66,8 @@ void VIO::clearState()
 	    delete pre_integrations[i]; 
 	pre_integrations[i] = NULL; 
     }
+    
+    R_imu = Eigen::Matrix3d::Identity(); 
 
  //    if(tmp_pre_integration != NULL)
 	// delete tmp_pre_integration; 
@@ -98,6 +101,7 @@ void VIO::processIMU(double dt, Vector3d & linear_acceleration, Vector3d& angula
 	Vector3d un_acc_0 = Rs[j] * (acc_0 - Bas[j]) - mg; 
 	Vector3d un_gyr = 0.5 *(gyr_0 + angular_velocity) - Bgs[j]; 
 	Rs[j] *= Utility::deltaQ(un_gyr * dt).toRotationMatrix(); 
+	R_imu *= Utility::deltaQ(un_gyr * dt).toRotationMatrix(); 
 	Vector3d un_acc_1 = Rs[j] * (linear_acceleration - Bas[j]) - mg;
 	Vector3d un_acc = 0.5 *(un_acc_0 + un_acc_1); 
 	Ps[j] += dt * Vs[j] + 0.5 * dt * dt * un_acc; 
@@ -148,6 +152,7 @@ void VIO::processDepthCloud(sensor_msgs::PointCloud2ConstPtr& depthCloud2)
     pcl::fromROSMsg(*depthCloud2, *tmpPC); 
     int depthCloudNum = tmpPC->points.size(); 
     // cout <<"vo receive "<<std::fixed<< mPCTime<<" dpt has: "<<depthCloudNum<<" points!"<<endl;
+    /*
     if(depthCloudNum > 20)
     {
 	for(int i=0; i<depthCloudNum; i++)
@@ -158,11 +163,12 @@ void VIO::processDepthCloud(sensor_msgs::PointCloud2ConstPtr& depthCloud2)
 	    tmpPC->points[i].z = mZoomDis;
 	} 
 	// mKDTree->setInputCloud(mPC); 
-    }
+    }*/
     m_pc_buf.lock(); 
 	pctime_buf.push(pctime); 
 	pc_buf.push(tmpPC);
     m_pc_buf.unlock(); 
+    con.notify_one();
 }
 
 void VIO::processImage(sensor_msgs::PointCloud2ConstPtr& imagePoints2)
@@ -194,14 +200,15 @@ void VIO::processImage(sensor_msgs::PointCloud2ConstPtr& imagePoints2)
 	removeWrongTri(vip); 
 
 	// solve odometry 
-	solveOdometry(vip); 
-
-	// remove outliers
-	removeOutliers(vip);
-
-	// solve it angin 
 	solveOdometry(vip, floor_detected()); 
-
+/*
+	if(!mbStill)
+	{
+	    // remove outliers
+	    removeOutliers(vip);
+	    // solve it angin 
+	    solveOdometry(vip, floor_detected()); 
+	}*/
 	// slide for next loop 
 	slideWindow(); 
     }
@@ -232,6 +239,7 @@ bool VIO::floor_detected()
         {
             ROS_DEBUG("vio.cpp: succeed set current pointcloud at t = %lf", mTimeCurr);
             tmp_pc = curr_pc_buf.front();
+	     mCurrSinglePC = tmp_pc;
             curr_pctime_buf.pop(); 
             curr_pc_buf.pop(); 
             break;
@@ -322,7 +330,7 @@ void VIO::removeWrongTri(vector<ip_M>& ipRelations)
         ip_M& m = tmp[i];
         if(m.v == ip_M::DEPTH_TRI)
         {
-            if(m.s < 3.1)
+            if(m.s < 3.1) // since the depth of points < 3.1 shoud be directly measured
                 m.v = ip_M::INVALID;
         }
     }
@@ -455,17 +463,22 @@ void VIO::prepareForDisplay(vector<ip_M>& ipRelations)
     {
 	// transform to world coordinate 
 	pcl::PointCloud<pcl::PointXYZ>::Ptr tmp(new pcl::PointCloud<pcl::PointXYZ>);
-	tmp->points.resize(mPC->points.size()); 
-	for(int i=0; i<mPC->points.size(); i++)
+	if(!b_use_curr_single_pc)
 	{
-	    pcl::PointXYZI& pt = mPC->points[i]; 
-	    tf::Vector3 pj(pt.x/mZoomDis*pt.intensity, pt.y/mZoomDis*pt.intensity, pt.intensity); 
-	    tf::Vector3 pi = mLastPose * pj; 
-	    pcl::PointXYZ ptw(pi.getX(), pi.getY(), pi.getZ());
-	    tmp->points[i] = ptw; 
+	     tmp->points.resize(mPC->points.size()); 
+	     for(int i=0; i<mPC->points.size(); i++)
+		{
+	   	pcl::PointXYZI& pt = mPC->points[i]; 
+	    	tf::Vector3 pj(pt.x/mZoomDis*pt.intensity, pt.y/mZoomDis*pt.intensity, pt.intensity); 
+	    	tf::Vector3 pi = mLastPose * pj; 
+	    	pcl::PointXYZ ptw(pi.getX(), pi.getY(), pi.getZ());
+	    	tmp->points[i] = ptw; 
+		}
 	}
 	// remove floor 
 	removeFloorPts(tmp, mPCNoFloor); 
+	// if(mPCNoFloor->points.size() == 0)
+	   // ROS_ERROR("vio: mPCNoFloor has zero points!!"); 
     }
 
     // save this for displaying 
@@ -515,6 +528,13 @@ void VIO::solveOdometry(vector<ip_M>& vip, bool use_floor_plane)
     if(ESTIMATE_EXTRINSIC == 0)
 	   problem.SetParameterBlockConstant(para_Ex_Pose[0]); 
     }
+    
+    if(mbStill)
+    {
+	Ps[WN] = Ps[WN-1]; 
+	Vs[WN] = Vs[WN-1];
+	Rs[WN] = Rs[WN-1]; 
+    }
 
     priorOptimize(vip); 
 
@@ -530,39 +550,44 @@ void VIO::solveOdometry(vector<ip_M>& vip, bool use_floor_plane)
     // cout<<"IMU factor covariance: "<<endl<<imu_factor->pre_integration->covariance<<endl;
 	problem.AddResidualBlock(imu_factor, NULL, para_Pose[i], para_SpeedBias[i], para_Pose[j], para_SpeedBias[j]);
     }
-    
-    // add plane factor 
-    if(use_floor_plane)
+    if(!mbStill) // motion
     {
-	// cout<<"vio.cpp: add plane_factor with plane_g: "<<Pls[0].transpose()<<" plane_l: "<<Pls[1].transpose()<<endl;
-	PlaneFactor_P1 * plane_factor = new PlaneFactor_P1(Pls[0], Pls[1]); 
-	problem.AddResidualBlock(plane_factor, NULL, para_Pose[1]);
-    }
-    
-    // add feature factor 
-    const float INIT_DIS = 10; 
-    int N = vip.size(); 
-    for(int i=0; i<N; i++)
-    {
-	ip_M& pt = vip[i]; 
-	Eigen::Vector3d p1(pt.ui, pt.vi, 1.); 
-	Eigen::Vector3d p2(pt.uj, pt.vj, 1.); 
-	if(pt.v == ip_M::NO_DEPTH)
+	// add plane factor 
+	if(use_floor_plane)
 	{
-	    para_Feature[i][0] = 1./INIT_DIS; 
-	    ProjectionFactor_Y2 * f= new ProjectionFactor_Y2(p1, p2); 
-	    problem.AddResidualBlock(f, loss_function, para_Pose[0], para_Pose[1], para_Ex_Pose[0], para_Feature[i]); 
-	}else if(pt.v == ip_M::DEPTH_MES || pt.v == ip_M::DEPTH_TRI)
+	    // cout<<"vio.cpp: add plane_factor with plane_g: "<<Pls[0].transpose()<<" plane_l: "<<Pls[1].transpose()<<endl;
+	    PlaneFactor_P1 * plane_factor = new PlaneFactor_P1(Pls[0], Pls[1]); 
+	    problem.AddResidualBlock(plane_factor, NULL, para_Pose[1]);
+	}
+
+	// add feature factor 
+	const float INIT_DIS = 10; 
+	int N = vip.size(); 
+	for(int i=0; i<N; i++)
 	{
-	    para_Feature[i][0] = 1./pt.s; 
-	    ProjectionFactor * f = new ProjectionFactor(p1, p2); 
-	    f->sqrt_info = 240 * Eigen::Matrix2d::Identity(); 
-	    problem.AddResidualBlock(f, loss_function, para_Pose[0], para_Pose[1], para_Ex_Pose[0], para_Feature[i]);
-	    if(pt.v == ip_M::DEPTH_MES)
+	    ip_M& pt = vip[i]; 
+	    Eigen::Vector3d p1(pt.ui, pt.vi, 1.); 
+	    Eigen::Vector3d p2(pt.uj, pt.vj, 1.); 
+	    if(pt.v == ip_M::NO_DEPTH)
+	    {
+		para_Feature[i][0] = 1./INIT_DIS; 
+		ProjectionFactor_Y2 * f= new ProjectionFactor_Y2(p1, p2); 
+		problem.AddResidualBlock(f, loss_function, para_Pose[0], para_Pose[1], para_Ex_Pose[0], para_Feature[i]); 
+	    }else if(pt.v == ip_M::DEPTH_MES || pt.v == ip_M::DEPTH_TRI)
+	    {
+		para_Feature[i][0] = 1./pt.s; 
+		ProjectionFactor * f = new ProjectionFactor(p1, p2); 
+		f->sqrt_info = 240 * Eigen::Matrix2d::Identity(); 
+		problem.AddResidualBlock(f, loss_function, para_Pose[0], para_Pose[1], para_Ex_Pose[0], para_Feature[i]);
+		if(pt.v == ip_M::DEPTH_MES)
 		    problem.SetParameterBlockConstant(para_Feature[i]);
-	}	
-    }   
-    
+	    }	
+	}   
+    }else // camera kept still, no motion 
+    {
+	// fix the last pose 
+	problem.SetParameterBlockConstant(para_Pose[WN]);
+    }
     // optimize it 
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_SCHUR;
@@ -800,10 +825,31 @@ void VIO::prepareNextLoop()
     mvDptLast.clear();
     return ; 
 }
+/*
+void VIO::setPointCloudAt(double t)
+{
+  boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> > tmpPC(new pcl::PointCloud<pcl::PointXYZI>()); 
+    // mPC->clear(); 
+    mPC.swap(tmpPC);
+    b_use_curr_single_pc = false;
+    mPC = mCurrSinglePC->makeShared(); 
+    ROS_DEBUG("vio.cpp: mPC has %d points", mPC->points.size());
+    if(!mPC->empty())
+    {
+		mKDTree->setInputCloud(mPC);
+		b_use_curr_single_pc = true;
+    }
+    return ; 
+}*/
+	
 
 void VIO::setPointCloudAt(double t)
 {
-    mPC->clear(); 
+    static bool once = true; // handle the case when no depth data is available in the beginning 
+    boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> > tmpPC(new pcl::PointCloud<pcl::PointXYZI>()); 
+    // mPC->clear(); 
+    mPC.swap(tmpPC);
+    b_use_curr_single_pc = false;
     m_pc_buf.lock(); 
 	while(!pctime_buf.empty())
 	{
@@ -823,12 +869,78 @@ void VIO::setPointCloudAt(double t)
 		pc_buf.pop(); 
 		break;
 	    }else{ // tmp > t
-		ROS_WARN("vio.cpp: no point cloud available for t= %lf", t);
+		ROS_ERROR("vio.cpp: no point cloud available for t= %lf, use previous PC", t);
+		mPC.swap(tmpPC);
 		break; 
 	    }
 	}
     m_pc_buf.unlock(); 
+    
+	
+    if(mPC->empty())
+    {
+	 ROS_INFO("vio.cpp: no point cloud available for t= %lf, use currentPC", t);
+	 // mPC = mCurrSinglePC->makeShared(); 
+	 
+	 int depthCloudNum = mCurrSinglePC->points.size(); 
+	 if(depthCloudNum > 20)
+        {
+        	mPC->points.resize(depthCloudNum); 
+		for(int i=0; i<depthCloudNum; i++)
+	 	{
+	     		mPC->points[i].x = mCurrSinglePC->points[i].x * mZoomDis / mCurrSinglePC->points[i].z;
+	     		mPC->points[i].y = mCurrSinglePC->points[i].y * mZoomDis / mCurrSinglePC->points[i].z;
+	     		mPC->points[i].intensity = mCurrSinglePC->points[i].z; 
+	     		mPC->points[i].z = mZoomDis;
+	 	} 
+	 }
+	 ROS_DEBUG("vio.cpp: mPC has %d points", mPC->points.size());
+	 if(!mPC->empty())
+	 {
+		mKDTree->setInputCloud(mPC);
+		b_use_curr_single_pc = true;
+		once = false; 
+	 }
+	else{
+		
+	// mPC.swap(tmpPC); 
+	// mKDTree->setInputCloud(mPC);
+	// wait for the depth cloud 
+	if(once == false)
+	{
+	 ROS_ERROR("vio.cpp: no point cloud available for t= %f, wait for it", t); 
+	 std::unique_lock<std::mutex> lk(m_pc_buf);
+        con.wait(lk, [&]
+                 {
+                 while(!pctime_buf.empty())
+		  {
+                    double tmp = pctime_buf.front(); 
+		     if(tmp == t)
+		     {
+			 mPC = pc_buf.front(); 
+			 mKDTree->setInputCloud(mPC);
+			 ROS_DEBUG("vio.cpp: get depth cloud at t = %f", t);
+			 break; 
+		      }
+		     if(tmp > t)
+		     {
+			 ROS_ERROR("vio.cpp: no depth cloud for t = %lf, use previous depth cloud", t); 
+			 mPC.swap(tmpPC);
+			 break; 
+		      }
+		   	pctime_buf.pop();
+		       pc_buf.pop();
+                 }
+            	  return (!mPC->empty());
+                 });
+        lk.unlock();
+	}
+	}
+    }else{
+    	once = false; 
+    }
 }
+
 
 void VIO::associateFeatures(vector<ip_M>& vip)
 {
@@ -858,6 +970,8 @@ void VIO::associateFeatures(vector<ip_M>& vip)
     int cnt_depth_mes = 0; 
     int cnt_depth_tri = 0; 
     int cnt_not_matched = 0; 
+    double disparity = 0; 
+    // static ofstream fdis("disparity.log"); 
     for(int i=0; i<imgPTLastNum; i++)
     {
 	bool ipFound = false; 
@@ -880,6 +994,9 @@ void VIO::associateFeatures(vector<ip_M>& vip)
 	    ipr.vi = mImgPTLast->points[i].v; 
 	    ipr.uj = mImgPTCurr->points[j].u; 
 	    ipr.vj = mImgPTCurr->points[j].v; 
+	    
+	    disparity += sqrt(SQ(ipr.ui - ipr.uj) + SQ(ipr.vi - ipr.vj)); 
+
 	    ipr.ind = mImgPTCurr->points[j].ind;
 
 	    ips.x = mZoomDis * ipr.ui; 
@@ -1009,15 +1126,30 @@ void VIO::associateFeatures(vector<ip_M>& vip)
     }
     vip = ipRelations; 
     ROS_DEBUG("vio.cpp: total %d no matches %d matches %d, no_depth: %d depth_with_meas: %d depth_with_tri: %d",imgPTLastNum, cnt_not_matched, cnt_matched, cnt_no_depth, cnt_depth_mes, cnt_depth_tri);
+    // fdis << std::fixed<<disparity<<endl; 
+    
+    mbStill = false; 
+
+    if(cnt_matched > 3)
+    {
+	disparity /= (double)(cnt_matched); 
+	if(disparity < 0.002)
+	{
+	    ROS_WARN("vio: still cnt_matched: %d mean disparity: %lf < 0.002", cnt_matched, disparity); 
+	    mbStill = true; 
+	}
+    }
 }
 
 
 void VIO::removeFloorPts(boost::shared_ptr<pcl::PointCloud<pcl::PointXYZ> >& in, boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> >& out)
 {
-    TicToc t_fz; 
+    TicToc t_fz;
+    out->points.clear();
+    out->width = 0; 
+    out->height = 0; 
     if(in->points.size() < 100)
 	return ; 
-    out->points.clear();
 
     double min_z, max_z; 
 

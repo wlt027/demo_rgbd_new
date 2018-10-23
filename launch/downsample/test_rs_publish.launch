@@ -1,0 +1,11 @@
+<launch>
+   <node pkg="demo_rgbd_new" type="rs_publisher_rgbd" name="rs_publiser" output="screen">
+   	<param name="publish_point_cloud" type="bool" value="true"/>
+	<param name="fx" type="double" value="309.235"/>
+	<param name="fy" type="double" value="309.381"/>
+	<param name="cx" type="double" value="213.547"/>
+	<param name="cy" type="double" value="118.772"/>
+
+   </node>
+
+</launch>

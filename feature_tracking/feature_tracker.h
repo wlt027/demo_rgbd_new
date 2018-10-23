@@ -25,6 +25,8 @@ class CTrackerParam
 	~CTrackerParam(); 
 	
 	void defaultInit(); 
+	bool readParam(string filename); 
+	void printParam(); 
 
 	// subregion 
 	int mXSubregionNum;
@@ -88,6 +90,8 @@ public:
 	void showPreFeatImg(); 
 
 	void setMask(); 
+
+	bool readParam(string filename); 
 
 	// whether initialized
 	bool mbInited; 

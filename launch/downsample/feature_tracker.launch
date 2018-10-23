@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="demo_rgbd_new" type="featureTracking_node" name="feature_tracking" output="screen">
+	<param name="config_file" type="string" value="$(find demo_rgbd_new)/config/downsample.yaml"/>
+    </node>
+</launch>

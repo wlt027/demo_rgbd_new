@@ -8,3 +8,4 @@ export ROS_HOSTNAME="davidz-T430"
 
 # rosrun rviz rviz -d "vio_laser.rviz"
 roslaunch show_result.launch
+# roslaunch show_rviz.launch

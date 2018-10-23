@@ -9,6 +9,7 @@
 #include "../utility/tic_toc.h"
 #include <Eigen/Core>
 #include <ros/ros.h>
+#include <iostream>
 
 #define SQ(x) ((x)*(x))
 
@@ -50,6 +51,71 @@ void CTrackerParam::defaultInit()
     
     mHarrisThreshold = 1e-8; // 1e-6; // 1e-6;    
     mMinDist = 20.0;
+}
+
+bool CTrackerParam::readParam(string filename)
+{
+    cv::FileStorage fsSettings(filename, cv::FileStorage::READ);
+    if(!fsSettings.isOpened())
+    {
+        std::cerr << "feature_tracker: ERROR: Wrong path to settings" << std::endl;
+	 return false; 
+    }
+
+   mXSubregionNum = fsSettings["sub_region_x"];
+   mYSubregionNum = fsSettings["sub_region_y"]; 
+   mTotalSubregionNum = mXSubregionNum * mYSubregionNum; 
+
+   mMaxFeatureNumInSubregion = fsSettings["max_n_feature_subregion"]; 
+   mMaxFeatureNum = mMaxFeatureNumInSubregion * mTotalSubregionNum; 
+
+   mXBoundary = fsSettings["boundary_x"]; 
+   mYBoundary = fsSettings["boundary_y"]; 
+
+   cv::FileNode n = fsSettings["projection_parameters"]; 
+   mfx = static_cast<double>(n["fx"]); 
+   mfy = static_cast<double>(n["fy"]); 
+   mcx = static_cast<double>(n["cx"]);
+   mcy = static_cast<double>(n["cy"]);
+
+   n = fsSettings["distortion_parameters"]; 
+   mk[0] = static_cast<double>(n["k1"]); 
+   mk[1] = static_cast<double>(n["k2"]); 
+   mp[0] = static_cast<double>(n["p1"]); 
+   mp[1] = static_cast<double>(n["p2"]); 
+   mWidth = fsSettings["image_width"]; 
+   mHeight = fsSettings["image_height"]; 
+   mMinDist = fsSettings["min_dist_between_features"]; 
+   mHarrisThreshold = fsSettings["harris_threshold"]; 
+
+   int show_result = fsSettings["show_feature_tracking_result"];
+   mbShowTrackedResult = (show_result != 0);
+    mSubregionWidth = (double)(mWidth - 2*mXBoundary) / (double)(mXSubregionNum); 
+    mSubregionHeight = (double) (mHeight - 2*mYBoundary) / (double)(mYSubregionNum); 
+    
+   fsSettings.release();
+   return true;
+
+}
+
+void CTrackerParam::printParam()
+{
+	
+	cout<<"print TrackParam: "<<endl; 
+	cout<<"image width: "<<mWidth<<"height: "<<mHeight<<endl; 
+	cout<<"fx = "<<mfx<<" fy = "<<mfy<<" cx = "<<mcx<<" cy = "<<mcy<<endl; 
+	cout<<"k1 = "<<mk[0]<<" k2 = "<<mk[1]<<" p1= "<<mp[0]<<" p2 = "<<mp[1]<<endl; 
+	cout<<"subregion_x= "<<mXSubregionNum<<" subregion_y= "<<mYSubregionNum<<endl;
+	cout<<"boundary_x= "<<mXBoundary<<" boundary_y =  "<<mYBoundary<<endl; 
+	cout<<"min_dist_between_features= "<<mMinDist<<" harris_threshold = "<<mHarrisThreshold<<endl;
+} 
+
+
+bool CFeatureTracker::readParam(string filename)
+{  
+   bool ret =  mParam.readParam(filename);  
+   if(ret) init(); 
+   return ret; 
 }
 
 CFeatureTracker::CFeatureTracker()
@@ -191,68 +257,71 @@ bool CFeatureTracker::handleImage(const cv::Mat& _img, double img_time)
 	    }
 	}
     }
-    
-    // track the features 
-    vector<uchar> status; 
-    vector<float> err; 
-    cv::calcOpticalFlowPyrLK(mPreImg, mCurImg, mvPrePts, mvCurPts, status, err, cv::Size(mParam.mTrackWinSize, mParam.mTrackWinSize), 3); 
-    
+  
     for(int i=0; i<mParam.mTotalSubregionNum; i++)
     {
 	mvSubregionFeatureNum[i] = 0; 
     }
-    
-    // check which points are valid 
-    assert(mPreTotalFeatureNum == mvPrePts.size()); 
-    ImagePoint point; 
     int featureCount = 0; 
 
-    // mvPrePts only contains the points matched with mCurImg 
-    // while mvPreImagePts contains the points matched with mCurImg and with previous Image 
-    for(int i=0; i<mPreTotalFeatureNum; i++)
+    // track the features 
+    vector<uchar> status; 
+    vector<float> err; 
+    if(mvPrePts.size() > 0)
     {
-	if(!status[i] || !inBoard(mvPrePts[i]))
-	    continue; 
-	double trackDis = sqrt(SQ(mvCurPts[i].x - mvPrePts[i].x) + SQ(mvCurPts[i].y - mvPrePts[i].y)); 
-	
-	if(trackDis <= mParam.mMaxTrackDis)
+	cv::calcOpticalFlowPyrLK(mPreImg, mCurImg, mvPrePts, mvCurPts, status, err, cv::Size(mParam.mTrackWinSize, mParam.mTrackWinSize), 3); 
+
+	// check which points are valid 
+	assert(mPreTotalFeatureNum == mvPrePts.size()); 
+	ImagePoint point; 
+
+	// mvPrePts only contains the points matched with mCurImg 
+	// while mvPreImagePts contains the points matched with mCurImg and with previous Image 
+	for(int i=0; i<mPreTotalFeatureNum; i++)
 	{
-	    int xInd = (int)((mvPrePts[i].x - mParam.mXBoundary + 0.5)/mParam.mSubregionWidth); 
-	    int yInd = (int)((mvPrePts[i].y - mParam.mYBoundary + 0.5)/mParam.mSubregionHeight); 
-	    
-	    int ind = yInd * mParam.mXSubregionNum + xInd; 
+	    if(!status[i] || !inBoard(mvPrePts[i]))
+		continue; 
+	    double trackDis = sqrt(SQ(mvCurPts[i].x - mvPrePts[i].x) + SQ(mvCurPts[i].y - mvPrePts[i].y)); 
 
-	    if(mvSubregionFeatureNum[ind] < mParam.mMaxFeatureNumInSubregion)
+	    if(trackDis <= mParam.mMaxTrackDis)
 	    {
-		// this is a tracked pt in both pre and cur images
-		mvCurPts[featureCount] = mvCurPts[i];
-		mvPrePts[featureCount] = mvPrePts[i]; 
-		mvIds[featureCount] = mvIds[i]; 
-		
-		Eigen::Vector3d tmp; 
-		// mpCam->liftProjective(Eigen::Vector2d(mvCurPts[i].x, mvCurPts[i].y), tmp); 
-		tmp(0) = (mvCurPts[i].x - mParam.mcx)/mParam.mfx; 
-		tmp(1) = (mvCurPts[i].y - mParam.mcy)/mParam.mfy; 
-		point.u = tmp(0); 
-		point.v = tmp(1); 
-		point.ind = mvIds[i]; 
-		
-		// 
-		mvCurImagePts.push_back(point); 
-		
-		if(i >= recordFeatureNum) // new detected feature in preImg
-		{
-		    // mpCam->liftProjective(Eigen::Vector2d(mvPrePts[i].x, mvPrePts[i].y), tmp);
-		    // cout <<"mvPrePts: "<<mvPrePts[i].x<<" "<< mvPrePts[i].y<<" output: "<<tmp(0)<<" "<<tmp(1)<<endl;
-		    tmp(0) = (mvPrePts[i].x - mParam.mcx)/mParam.mfx; 
-		    tmp(1) = (mvPrePts[i].y - mParam.mcy)/mParam.mfy; 
+		int xInd = (int)((mvPrePts[i].x - mParam.mXBoundary + 0.5)/mParam.mSubregionWidth); 
+		int yInd = (int)((mvPrePts[i].y - mParam.mYBoundary + 0.5)/mParam.mSubregionHeight); 
 
+		int ind = yInd * mParam.mXSubregionNum + xInd; 
+
+		if(mvSubregionFeatureNum[ind] < mParam.mMaxFeatureNumInSubregion)
+		{
+		    // this is a tracked pt in both pre and cur images
+		    mvCurPts[featureCount] = mvCurPts[i];
+		    mvPrePts[featureCount] = mvPrePts[i]; 
+		    mvIds[featureCount] = mvIds[i]; 
+
+		    Eigen::Vector3d tmp; 
+		    // mpCam->liftProjective(Eigen::Vector2d(mvCurPts[i].x, mvCurPts[i].y), tmp); 
+		    tmp(0) = (mvCurPts[i].x - mParam.mcx)/mParam.mfx; 
+		    tmp(1) = (mvCurPts[i].y - mParam.mcy)/mParam.mfy; 
 		    point.u = tmp(0); 
 		    point.v = tmp(1); 
-		    mvPreImagePts.push_back(point); 
+		    point.ind = mvIds[i]; 
+
+		    // 
+		    mvCurImagePts.push_back(point); 
+
+		    if(i >= recordFeatureNum) // new detected feature in preImg
+		    {
+			// mpCam->liftProjective(Eigen::Vector2d(mvPrePts[i].x, mvPrePts[i].y), tmp);
+			// cout <<"mvPrePts: "<<mvPrePts[i].x<<" "<< mvPrePts[i].y<<" output: "<<tmp(0)<<" "<<tmp(1)<<endl;
+			tmp(0) = (mvPrePts[i].x - mParam.mcx)/mParam.mfx; 
+			tmp(1) = (mvPrePts[i].y - mParam.mcy)/mParam.mfy; 
+
+			point.u = tmp(0); 
+			point.v = tmp(1); 
+			mvPreImagePts.push_back(point); 
+		    }
+		    featureCount++;
+		    mvSubregionFeatureNum[ind]++; 
 		}
-		featureCount++;
-		mvSubregionFeatureNum[ind]++; 
 	    }
 	}
     }

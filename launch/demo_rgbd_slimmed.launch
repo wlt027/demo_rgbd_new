@@ -3,7 +3,8 @@
   <node pkg="demo_rgbd_new" type="featureTracking_node" name="feature_tracking" output="screen"/>
   <!-- node pkg="demo_rgbd_new" type="featureTracking_ori" name="feature_tracking_ori" output="screen"/-->
   <node pkg="demo_rgbd_new" type="visual_odometry" name="visual_odometry" output="screen"/>
-  <node pkg="demo_rgbd_new" type="depth_handler" name="depth_handler" output="screen"/>
+  <node pkg="demo_rgbd_new" type="depth_handler" name="depth_handler" output="screen">
+  </node>
 
   <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find demo_rgbd_new)/launch/demo_rgbd_slimmed.rviz"/>
 

@@ -16,6 +16,7 @@
 #include <opencv2/opencv.hpp>
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/Imu.h>
+#include <std_msgs/Float32MultiArray.h>
 
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
@@ -24,6 +25,8 @@
 #include "vio.h"
 #include "parameters.h"
 #include "../utility/tic_toc.h"
+
+#define R2D(r) ((r)*180./M_PI)
 
 VIO vio; 
 std::mutex m_buf;
@@ -37,6 +40,7 @@ ros::Publisher *imagePointsProjPubPointer = NULL;
 ros::Publisher *obstaclePCPubPointer = NULL;
 ros::Publisher *imageShowPubPointer = NULL;
 ros::Publisher *floorPCPubPointer = NULL; 
+ros::Publisher *imuEulerPubPointer = NULL; 
 
 tf::TransformBroadcaster * tfBroadcasterPointer = NULL; // camera_init to camera
 tf::TransformBroadcaster * tfBroadcastTWI; // world to imu
@@ -96,6 +100,14 @@ void currDepthCloudHandler(const sensor_msgs::PointCloud2ConstPtr& depthCloud2)
     vio.processCurrDepthCloud(depthCloud2);
 }
 
+void getEulerYPR(Eigen::Matrix3d& R, tfScalar& yaw, tfScalar& pitch, tfScalar& roll)
+{
+    tf::Matrix3x3 tR(R(0,0), R(0,1), R(0,2), 
+		     R(1,0), R(1,1), R(1,2),
+		     R(2,0), R(2,1), R(2,2));
+    tR.getEulerYPR(yaw, pitch, roll); 
+}
+
 void send_imu(const sensor_msgs::ImuConstPtr &imu_msg)
 {
     double t = imu_msg->header.stamp.toSec();
@@ -116,6 +128,15 @@ void send_imu(const sensor_msgs::ImuConstPtr &imu_msg)
     Eigen::Vector3d acc(dx, dy, dz); 
     Eigen::Vector3d gyr(rx, ry, rz);
     vio.processIMU(dt, acc, gyr) ; 
+
+    // test IMU's rotation 
+    tfScalar y, p, r; 
+    // getEulerYPR(vio.R_imu, y, p, r); 
+    std_msgs::Float32MultiArray msg; 
+    msg.data.resize(3); 
+    msg.data[0] = r; msg.data[1] = p; msg.data[2] = y; 
+    // imuEulerPubPointer->publish(msg); 
+   // ROS_DEBUG("vio_node: publish roll: %f pitch: %f yaw: %f", R2D(r), R2D(p), R2D(y)); 
 }
 
 std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloud2ConstPtr>>
@@ -183,6 +204,9 @@ int main(int argc, char **argv)
 
     ros::Publisher imageShowPub = nh.advertise<sensor_msgs::Image>("/image/show_2", 1);
     imageShowPubPointer = &imageShowPub;
+    
+    ros::Publisher imuEulerPub = nh.advertise<std_msgs::Float32MultiArray>("/euler_msg", 10); 
+    imuEulerPubPointer = &imuEulerPub; 
 
     std::thread measurement_process{process};
     std::thread depthcloud_process{process_depthcloud}; 
@@ -238,11 +262,12 @@ void process()
 	    // estimator.processImage(image, img_msg->header);
 	    vio.processImage(img_msg); 
 	    double whole_t = t_s.toc();
-	    ROS_DEBUG("vio_node.cpp: vo cost %f ms", whole_t); 
+	    ROS_WARN("vio_node.cpp: vo cost %f ms", whole_t); 
 	    sum_vo_t += whole_t; 
-	    ROS_DEBUG("vio_node.cpp: average vo cost %f ms", sum_vo_t/(++sum_vo_cnt));
+	    ROS_WARN("vio_node.cpp: average vo cost %f ms", sum_vo_t/(++sum_vo_cnt));
 
         publishMsg(img_msg); 
+	 ros::spinOnce();
 	}
     }
 }
@@ -299,7 +324,8 @@ void publishMsg(sensor_msgs::PointCloud2ConstPtr& img_msg)
         vioDataPubPointer->publish(vioData);
         cout <<"vio publish: vio t "<<t.getX()<<" "<<t.getY() <<" "<<t.getZ()<<endl;
         cout <<"vio publish: vio q "<< q.getX()<<" "<< q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl;
-
+        ros::spinOnce();
+	
         {
         // broadcast voTrans imu -> camera 
         tf::StampedTransform voTrans;
@@ -334,6 +360,8 @@ void publishMsg(sensor_msgs::PointCloud2ConstPtr& img_msg)
             // publish obstacle point 
             sensor_msgs::PointCloud2 obstaclePC2;
             pcl::toROSMsg(*(vio.mPCNoFloor), obstaclePC2);
+	    // ROS_INFO("vio: mPCNoFloor has %d points, width: %d height: %d, obstacle width: %d height: %d", vio.mPCNoFloor->points.size(), 
+	    // 	vio.mPCNoFloor->width, vio.mPCNoFloor->height, obstaclePC2.width, obstaclePC2.height); 
             obstaclePC2.header.frame_id = "world";
             obstaclePC2.header.stamp = ros::Time().fromSec(vio.mTimeLast);
             obstaclePCPubPointer->publish(obstaclePC2);    
@@ -399,7 +427,8 @@ void imageDataHandler(const sensor_msgs::Image::ConstPtr& imageData)
     cv::Mat show_img = ptr->image; 
 
     // double kImage[9] = {525.0, 0.0, 319.5, 0.0, 525.0, 239.5, 0.0, 0.0, 1.0};
-    double kImage[9] = {617.306, 0.0, 326.245, 0.0, 617.714, 239.974, 0.0, 0.0, 1.0};
+    // double kImage[9] = {617.306, 0.0, 326.245, 0.0, 617.714, 239.974, 0.0, 0.0, 1.0};
+    double kImage[9] = {FX, 0.0, CX, 0.0, FY, CY, 0.0, 0.0, 1.0};
     double showDSRate = 2.;
     vector<ip_M> ipRelations = vio.mPtRelations; 
     int ipRelationsNum = ipRelations.size();
