@@ -42,7 +42,7 @@ namespace{
 // template<int CLOUD_NUM>
 DepthHandler::DepthHandler(): 
 mCloudCnt(-1),
-mCloudSkip(5), 
+mCloudSkip(2), 
 mInitTime(-1),
 mCloudDSRate(5),
 mSyncCloudId(-1),
@@ -65,6 +65,68 @@ mCloudPub(new pcl::PointCloud<pcl::PointXYZI>())
 
 // template<int CLOUD_NUM>
 DepthHandler::~DepthHandler(){}
+
+void DepthHandler::cloudHandler3(const sensor_msgs::PointCloud2ConstPtr& depthCloud2)
+{
+	mCloudCnt = (mCloudCnt+1)%(mCloudSkip+1); 
+    if(mCloudCnt != 0) 
+		return ; 
+    if(mInitTime == -1)
+		mInitTime = depthCloud2->header.stamp.toSec(); 
+    double time = depthCloud2->header.stamp.toSec(); 
+    double timeElapsed = time - mInitTime; 
+
+    mSyncCloudId = (mSyncCloudId+1)%(CLOUD_NUM); 
+    mCloudStamp[mSyncCloudId] = time; 
+
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr tmpPC(new pcl::PointCloud<pcl::PointXYZRGB>); 
+	// ROS_INFO("before convert pc at time = %f", time); 
+    pcl::fromROSMsg(*depthCloud2, *tmpPC); 
+
+	/*{
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr tmpPC_filtered(new pcl::PointCloud<pcl::PointXYZRGB>); 
+    pcl::VoxelGrid<pcl::PointXYZRGB> downSizeFilter;
+    downSizeFilter.setInputCloud(tmpPC);
+    downSizeFilter.setLeafSize(0.1, 0.1, 0.1);
+    downSizeFilter.filter(*tmpPC_filtered);
+    tmpPC.swap(tmpPC_filtered);
+	}*/
+
+    // ROS_INFO("after convert pc at time = %f points: %d", time, tmpPC->points.size()); 
+    pcl::PointCloud<pcl::PointXYZI>::Ptr tmpPC2(new pcl::PointCloud<pcl::PointXYZI>); 
+    // tmpPC2->points.resize(tmpPC->points.size()); 
+    tmpPC2->points.reserve(tmpPC->points.size());
+    for(int i=0; i<tmpPC->points.size(); i++)
+    {
+    	pcl::PointXYZRGB& pt1 = tmpPC->points[i]; 
+    	pcl::PointXYZI& pt2 = tmpPC2->points[i];
+    	if(pt1.x != pt1.x || pt1.y != pt1.y || pt1.z != pt1.z)
+    	{
+    		ROS_ERROR("depth_handler: invalid point exist!");
+    		continue; 
+    	}
+    	if(pt1.z <= 0.3 || pt1.z >= 7.)
+    		continue; 
+    	pt2.x = pt1.x; pt2.y = pt1.y; pt2.z = pt1.z; 
+    	pt2.intensity = timeElapsed; 
+    	tmpPC2->points.push_back(pt2); 
+    	// ROS_INFO("i = %d pt assign pt = %f %f %f", i, pt1.x, pt1.y, pt1.z);
+    }
+    
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloudPointer = mCloudArray[mSyncCloudId]; 
+    // ROS_INFO("mSyncCloudId = %d cloudPointer = %f", mSyncCloudId, cloudPointer);
+
+    cloudPointer->points.clear();
+    
+    pcl::VoxelGrid<pcl::PointXYZI> downSizeFilter;
+    downSizeFilter.setInputCloud(tmpPC2);
+    downSizeFilter.setLeafSize(0.1, 0.1, 0.1);
+    downSizeFilter.filter(*cloudPointer);
+    cout <<std::fixed<<"depth_handler.cpp: finish pc at "<<time<<" with input "<<cloudPointer->points.size()<<" points!"<<endl; 
+    // ROS_INFO("finish cloudHandler3");
+    return ; 
+}
+
 
 void DepthHandler::cloudHandler2(const sensor_msgs::Image::ConstPtr& dpt_img_msg)
 {

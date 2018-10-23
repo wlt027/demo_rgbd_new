@@ -1,0 +1,13 @@
+<launch>
+
+    <arg name="config_file" default="$(find demo_rgbd_new)/config/euroc_config.yaml"/>
+    <arg name="vins_folder" default="$(find demo_rgbd_new)/result/"/>
+
+  <node pkg="demo_rgbd_new" type="featureTracking_node" name="feature_tracking" output="screen">
+    <remap from="/cam0/color" to="/rect/first/image"/>
+  </node>
+  
+  <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find demo_rgbd_new)/launch/vio_demo.rviz"/>
+
+
+</launch>

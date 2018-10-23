@@ -6,6 +6,7 @@
 
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/ros/conversions.h>
 #include <pcl/point_cloud.h>
@@ -23,6 +24,7 @@ public:
     ~DepthHandler(); 
     void cloudHandler(const sensor_msgs::Image::ConstPtr& dpt_img); 
     void cloudHandler2(const sensor_msgs::Image::ConstPtr& dpt_img);
+    void cloudHandler3(const sensor_msgs::PointCloud2ConstPtr& depthCloud2);
 
     void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData);
 
