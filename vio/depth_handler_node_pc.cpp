@@ -38,15 +38,25 @@ int main(int argc, char** argv)
   ros::NodeHandle nh;
   ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
   
+  ros::NodeHandle np("~"); 
+  string param_file(""); 
+  np.param("config_file", param_file, param_file); 
+  if(param_file != "")
+  { 
+      pDptHandler->readParam(param_file);
+  }
+
   ros::Subscriber voDataSub = nh.subscribe<nav_msgs::Odometry> ("/cam_to_init", 5, voDataHandler);
   ros::Subscriber syncCloudSub = nh.subscribe<sensor_msgs::PointCloud2>
 	("/pointcloud", 5, syncCloudHandler);
 
-  ros::Publisher depthCloudPub = nh.advertise<sensor_msgs::PointCloud2> ("/pointcloud", 5);
+  ros::Publisher depthCloudPub = nh.advertise<sensor_msgs::PointCloud2> ("/depth_cloud", 5);
   depthCloudPubPointer = &depthCloudPub;
 
   ros::Publisher cur_depthCloudPub = nh.advertise<sensor_msgs::PointCloud2> ("/current_depth_cloud", 5);
   currDepthCloudPubPointer = &cur_depthCloudPub;
+
+
   std::thread pc_process{processPC}; 
 
   ros::spin();
@@ -56,7 +66,7 @@ int main(int argc, char** argv)
 
 void syncCloudHandler(const sensor_msgs::PointCloud2ConstPtr&  syncCloud2)
 {
-    ROS_INFO("receive syncCloud2 at time = %f", syncCloud2->header.stamp.toSec()); 
+    ROS_INFO("receive syncCloud2 at time = %f point cloud width %d height %d", syncCloud2->header.stamp.toSec(), syncCloud2->width, syncCloud2->height); 
     m_buf.lock();
     pc_buf.push(syncCloud2); 
     m_buf.unlock(); 

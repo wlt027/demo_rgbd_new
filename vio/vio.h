@@ -82,6 +82,7 @@ public:
     double mFloorRange; 
 
     volatile bool mbInited;  
+    bool mbStereo; // whether use stereo camera or other cameras like RGB-D camera 
 
     double mTimeLast; // current timestamp 
     double mTimeCurr; 

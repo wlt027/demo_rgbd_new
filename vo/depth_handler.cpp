@@ -45,6 +45,7 @@ mCloudCnt(-1),
 mCloudSkip(2), 
 mInitTime(-1),
 mCloudDSRate(5),
+mMaxDepth(3.),
 mSyncCloudId(-1),
 mRegCloudId(0),
 mTimeRec(0),
@@ -105,8 +106,11 @@ void DepthHandler::cloudHandler3(const sensor_msgs::PointCloud2ConstPtr& depthCl
     		ROS_ERROR("depth_handler: invalid point exist!");
     		continue; 
     	}
-    	if(pt1.z <= 0.3 || pt1.z >= 7.)
-    		continue; 
+    	if(pt1.z <= 0.3 || pt1.z >= mMaxDepth)
+        {
+    		// ROS_DEBUG("i = %d pt.z = %f", i, pt1.z); 
+            continue; 
+        }
     	pt2.x = pt1.x; pt2.y = pt1.y; pt2.z = pt1.z; 
     	pt2.intensity = timeElapsed; 
     	tmpPC2->points.push_back(pt2); 
@@ -141,7 +145,10 @@ bool DepthHandler::readParam(string config_file)
    mk[3] = static_cast<double>(n["cy"]);
 
    mCloudDSRate = fsSettings["cloud_ds_rate"]; 
-   
+   mCloudSkip = fsSettings["cloud_skip_rate"]; 
+   mMaxDepth = fsSettings["cloud_max_depth"]; 
+   ROS_DEBUG("depth_handler: read param mCloudDSRate = %d mCloudSkip = %d mMaxDepth = %f", mCloudDSRate, mCloudSkip, mMaxDepth);
+
    fsSettings.release(); 
    return true; 
 }
@@ -172,7 +179,7 @@ void DepthHandler::cloudHandler2(const sensor_msgs::Image::ConstPtr& dpt_img_msg
    // const float* syncCloud2Pointer = reinterpret_cast<const float*>(&dpt_img_msg->data[0]);
     float scale = 0.001; 
     float min_dis = 0.3; 
-    float max_dis = 3.;  // keep depth range 
+    float max_dis = mMaxDepth;  // keep depth range 
     for(double i = halfDS; i < dpt_img.rows; i += mCloudDSRate)
 	for(double j = halfDS; j < dpt_img.cols; j += mCloudDSRate)
 	{

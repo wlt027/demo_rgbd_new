@@ -19,7 +19,7 @@
 using namespace std;
 
 // template<int CLOUD_NUM>
-const static int CLOUD_NUM = 3; // 5 
+const static int CLOUD_NUM = 5; // 5 
 class DepthHandler
 {
 public:
@@ -44,6 +44,7 @@ public:
     boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> > mCloudRec; // recorded PointCloud 
     boost::shared_ptr<pcl::PointCloud<pcl::PointXYZI> > mCloudPub; // published PointCloud
     double mTimeRec; 
+    double mMaxDepth; // keep depth < mMaxDepth 
 
     // depth camera param 
     double mk[4]; // fx fy cx cy

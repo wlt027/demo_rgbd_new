@@ -50,7 +50,8 @@ mbFirstFloorObserved(false),
 mbInited(false),
 frame_count(0),
 mFloorZ(NOT_INITIED),
-mFloorRange(0.15)
+mFloorRange(0.15),
+mbStereo(false)
 {
     clearState();
 }
@@ -197,10 +198,11 @@ void VIO::processImage(sensor_msgs::PointCloud2ConstPtr& imagePoints2)
 	rejectByF(vip); 
 
 	// remove close triangulated point
-	removeWrongTri(vip); 
+    if(!mbStereo)
+	   removeWrongTri(vip); 
 
 	// solve odometry 
-	solveOdometry(vip, floor_detected()); 
+	solveOdometry(vip, !mbStereo && floor_detected()); 
 /*
 	if(!mbStill)
 	{
@@ -476,7 +478,8 @@ void VIO::prepareForDisplay(vector<ip_M>& ipRelations)
 		}
 	}
 	// remove floor 
-	removeFloorPts(tmp, mPCNoFloor); 
+    if(!mbStereo)
+	   removeFloorPts(tmp, mPCNoFloor); 
 	// if(mPCNoFloor->points.size() == 0)
 	   // ROS_ERROR("vio: mPCNoFloor has zero points!!"); 
     }

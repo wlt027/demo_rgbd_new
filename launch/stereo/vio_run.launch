@@ -5,12 +5,17 @@
 
   <node pkg="demo_rgbd_new" type="featureTracking_node" name="feature_tracking" output="screen">
     <remap from="/cam0/color" to="/rect/first/image"/>
+     <param name="config_file" type="string" value="$(arg config_file)"/>
   </node>
-  <node pkg="demo_rgbd_new" type="depth_handler_pc" name="depth_handler" output="screen"/>
+  <node pkg="demo_rgbd_new" type="depth_handler_pc" name="depth_handler" output="screen">
+   <param name="config_file" type="string" value="$(arg config_file)"/>
+  </node>
+
 
   <node pkg="demo_rgbd_new" type="vio_node" name="vio_node" output="screen">
     <param name="config_file" type="string" value="$(arg config_file)"/>
     <param name="vins_folder" type="string" value="$(arg vins_folder)"/>
+    <param name="stereo_input" type="bool" value="true"/>
   </node>
 
   <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find demo_rgbd_new)/launch/vio_demo.rviz"/>

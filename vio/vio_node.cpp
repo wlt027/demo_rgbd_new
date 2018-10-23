@@ -155,7 +155,12 @@ int main(int argc, char **argv)
     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
     readParameters(nh);
     vio.setParameter();
-    
+    nh.param("stereo_input", vio.mbStereo, vio.mbStereo);  
+    // if(vio.mbStereo)
+    {
+        // ROS_DEBUG("vio_node: stereo input is set!");
+    }
+
     ROS_WARN("waiting for image and imu...");
 
     // registerPub(n);
