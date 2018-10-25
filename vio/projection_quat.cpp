@@ -169,7 +169,7 @@ void PlaneFactor_P1::check(double ** parameters)
     double **jaco = new double *[1]; 
     jaco[0] = new double[3*7]; 
     Evaluate(parameters, res, jaco); 
-    puts("check begins"); 
+    puts("PlaneFactor_P1 check begins"); 
     puts("my"); 
     
     Eigen::Map<Eigen::Vector3d > res_v(res); 
@@ -186,7 +186,7 @@ void PlaneFactor_P1::check(double ** parameters)
     Unit3 nl(nl_e);
     double dl = nv_g.p_.dot(Pi) + d_g;
 
-    Eigen::Matrix<double, 3, 3> sqrt_info = Eigen::Matrix<double, 3, 3>::Identity()*100.;   
+    Eigen::Matrix<double, 3, 3> sqrt_info = Eigen::Matrix<double, 3, 3>::Identity()*700.;   
     Eigen::Vector3d y2;
     Eigen::Matrix62 d_B_d_p; 
     Eigen::Matrix<double, 3, 2> B = nv_l.getBasis(&d_B_d_p); 
@@ -398,7 +398,7 @@ void ProjectionFactor_Y2::check(double ** parameters)
     jaco[2] = new double[1*7]; 
     jaco[3] = new double[1*1]; 
     Evaluate(parameters, res, jaco); 
-    puts("check begins"); 
+    puts("ProjectionFactor_Y2 check begins"); 
     puts("my"); 
 
     cout <<"res: "<<res[0]<<endl; 
@@ -437,8 +437,8 @@ void ProjectionFactor_Y2::check(double ** parameters)
     Eigen::Quaterniond q(qw, qx, qy, qz); 
     Eigen::Matrix<double, 3, 3> R = q.toRotationMatrix(); 
 
-    double u0 = pts_i(0); double v0 = pts_i(1); 
-    double u1 = pts_j(0); double v1 = pts_j(1); 
+    double u0 = pts_j(0); double v0 = pts_j(1); 
+    double u1 = pts_i(0); double v1 = pts_i(1); 
     
     double tmp1 = -tz * v1 + ty; 
     double tmp2 =  u1 * tz - tx;
@@ -501,8 +501,8 @@ void ProjectionFactor_Y2::check(double ** parameters)
 	Eigen::Quaterniond q(qw, qx, qy, qz); 
 	Eigen::Matrix<double, 3, 3> R = q.toRotationMatrix(); 
 
-	double u0 = pts_i(0); double v0 = pts_i(1); 
-	double u1 = pts_j(0); double v1 = pts_j(1); 
+	double u0 = pts_j(0); double v0 = pts_j(1); 
+	double u1 = pts_i(0); double v1 = pts_i(1); 
 
 	double tmp1 = -tz * v1 + ty; 
 	double tmp2 =  u1 * tz - tx;

@@ -342,7 +342,7 @@ void VIO::rejectByF(vector<ip_M>& ipRelations)
 {
     TicToc t_f; 
     vector<ip_M>& tmp = ipRelations; 
-    if(tmp.size() == 0) return; 
+    if(tmp.size() <= 8) return; 
     vector<cv::Point2f> pre_pts(tmp.size()); 
     vector<cv::Point2f> cur_pts(tmp.size()); 
     for(int i=0; i<tmp.size();i++)
@@ -566,6 +566,8 @@ void VIO::solveOdometry(vector<ip_M>& vip, bool use_floor_plane)
 	// add feature factor 
 	const float INIT_DIS = 10; 
 	int N = vip.size(); 
+    if(N > 10)
+    {
 	for(int i=0; i<N; i++)
 	{
 	    ip_M& pt = vip[i]; 
@@ -585,7 +587,8 @@ void VIO::solveOdometry(vector<ip_M>& vip, bool use_floor_plane)
 		if(pt.v == ip_M::DEPTH_MES)
 		    problem.SetParameterBlockConstant(para_Feature[i]);
 	    }	
-	}   
+	}
+    }   
     }else // camera kept still, no motion 
     {
 	// fix the last pose 

@@ -65,6 +65,7 @@ void imgCallback(const sensor_msgs::Image::ConstPtr& _img)
 	// publish msg 
 	pcl::PointCloud<ImagePoint>::Ptr imagePointsLast(new pcl::PointCloud<ImagePoint>());
 	imagePointsLast->points.resize(feat_tracker.mvPreImagePts.size()); 
+	ROS_WARN("feature_tracker_node: track %d number of features", feat_tracker.mvPreImagePts.size());
 	for(int i=0; i<feat_tracker.mvPreImagePts.size(); i++)
 	{
 	    ImagePoint& pt = imagePointsLast->points[i]; 

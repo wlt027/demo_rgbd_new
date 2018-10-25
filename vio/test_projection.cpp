@@ -43,7 +43,7 @@ void test_plane();
 
 int main(int argc, char* argv[])
 {
-    // test(); 
+    test(); 
     
     if(argc >= 2)
 	log_file = string(argv[1]); 

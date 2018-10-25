@@ -20,6 +20,7 @@
 #include <condition_variable>
 #include <opencv2/core/eigen.hpp>
 #include <sensor_msgs/PointCloud2.h>
+#include <nav_msgs/Path.h>
 #include "../utility/pointDefinition.h"
 #include "imu_factor.h"
 #include "parameters.h"
@@ -161,5 +162,8 @@ public:
     // double para_Retrive_Pose[SIZE_POSE];
 
     bool mbStill; // whether camera is still, which is inferred by pixel disparity 
+
+    nav_msgs::Path m_gt_path;  // groundtruth path 
+    nav_msgs::Path m_est_path; // estimated path 
 
 };

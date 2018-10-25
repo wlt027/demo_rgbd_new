@@ -17,6 +17,8 @@
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/Imu.h>
 #include <std_msgs/Float32MultiArray.h>
+#include <geometry_msgs/PointStamped.h>
+#include <geometry_msgs/PoseStamped.h>
 
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
@@ -41,6 +43,8 @@ ros::Publisher *obstaclePCPubPointer = NULL;
 ros::Publisher *imageShowPubPointer = NULL;
 ros::Publisher *floorPCPubPointer = NULL; 
 ros::Publisher *imuEulerPubPointer = NULL; 
+ros::Publisher *groundtruthPubPointer = NULL; 
+ros::Publisher *estimatePathPubPointer = NULL; 
 
 tf::TransformBroadcaster * tfBroadcasterPointer = NULL; // camera_init to camera
 tf::TransformBroadcaster * tfBroadcastTWI; // world to imu
@@ -146,6 +150,7 @@ void process_depthcloud();
 void imageDataHandler(const sensor_msgs::Image::ConstPtr& imageData);
 void depthDataHandler(const sensor_msgs::Image::ConstPtr& depthData); 
 void publishMsg(sensor_msgs::PointCloud2ConstPtr& img_msg);
+void groundtruthHandler(const geometry_msgs::PointStampedConstPtr& gt_point); 
 
 int main(int argc, char **argv)
 {
@@ -213,6 +218,12 @@ int main(int argc, char **argv)
     ros::Publisher imuEulerPub = nh.advertise<std_msgs::Float32MultiArray>("/euler_msg", 10); 
     imuEulerPubPointer = &imuEulerPub; 
 
+    ros::Subscriber gtSub = nh.subscribe<geometry_msgs::PointStamped>("/leica/position", 7, groundtruthHandler);
+    ros::Publisher gtPub = nh.advertise<nav_msgs::Path>("/ground_truth_path", 7); 
+    ros::Publisher estimatePub = nh.advertise<nav_msgs::Path>("/estimate_path", 7); 
+    groundtruthPubPointer = &gtPub;
+    estimatePathPubPointer = &estimatePub; 
+
     std::thread measurement_process{process};
     std::thread depthcloud_process{process_depthcloud}; 
     ros::spin();
@@ -272,11 +283,25 @@ void process()
 	    ROS_WARN("vio_node.cpp: average vo cost %f ms", sum_vo_t/(++sum_vo_cnt));
 
         publishMsg(img_msg); 
-	 ros::spinOnce();
+	    ros::spinOnce();
+        static ofstream process_time_log("process_time.log"); 
+        process_time_log << whole_t<<endl; 
 	}
     }
 }
 
+void groundtruthHandler(const geometry_msgs::PointStampedConstPtr& gt_point)
+{
+    geometry_msgs::PoseStamped ps;   
+    ps.header = gt_point->header; 
+    ps.pose.position.x = gt_point->point.x;
+    ps.pose.position.y = gt_point->point.y; 
+    ps.pose.position.z = gt_point->point.z;
+    ps.pose.orientation.x = ps.pose.orientation.y = ps.pose.orientation.z = 0;
+    ps.pose.orientation.w = 1.; 
+    vio.m_gt_path.poses.push_back(ps); 
+    vio.m_gt_path.header = ps.header;  
+}
 
 void publishMsg(sensor_msgs::PointCloud2ConstPtr& img_msg)
 {
@@ -331,6 +356,21 @@ void publishMsg(sensor_msgs::PointCloud2ConstPtr& img_msg)
         cout <<"vio publish: vio q "<< q.getX()<<" "<< q.getY()<<" "<<q.getZ()<<" "<<q.getW()<<endl;
         ros::spinOnce();
 	
+        // write result to file
+        ofstream foutC(VINS_RESULT_PATH, ios::app);
+        foutC.setf(ios::fixed, ios::floatfield);
+        foutC.precision(0);
+        foutC << vioData.header.stamp.toSec() * 1e9 << ",";
+        foutC.precision(5);
+        foutC << t.getX() << ","
+              << t.getY() << ","
+              << t.getZ() << ","
+              << q.getW() << ","
+              << q.getX() << ","
+              << q.getY() << ","
+              << q.getZ() << "," << endl;
+        foutC.close();
+
         {
         // broadcast voTrans imu -> camera 
         tf::StampedTransform voTrans;
@@ -380,6 +420,22 @@ void publishMsg(sensor_msgs::PointCloud2ConstPtr& img_msg)
             floorPC2.header.frame_id = "world"; 
             floorPC2.header.stamp = ros::Time().fromSec(vio.mTimeLast); 
             floorPCPubPointer->publish(floorPC2);
+        }
+        {
+            // publish ground truth path 
+            vio.m_gt_path.header.frame_id = vioData.header.frame_id;
+            groundtruthPubPointer->publish(vio.m_gt_path);
+
+        }
+        {
+            // publish estiamted path 
+            geometry_msgs::PoseStamped ps;   
+            ps.header = vioData.header; 
+            ps.pose.position = vioData.pose.pose.position;
+            ps.pose.orientation = vioData.pose.pose.orientation; 
+            vio.m_est_path.poses.push_back(ps); 
+            vio.m_est_path.header = ps.header;  
+            estimatePathPubPointer->publish(vio.m_est_path);
         }
         // cout <<"publish imagePointsProj2 with "<<imagePointsProj2.height * imagePointsProj2.width<<" points!"<<" at time "<<std::fixed<<vio.mTimeLast<<endl;
 
