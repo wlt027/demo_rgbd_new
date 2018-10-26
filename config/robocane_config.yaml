@@ -5,7 +5,7 @@
 # TODO: change these topics 
 imu_topic: "/imu0"
 image_topic: "/cam0/color" # "/cam0/image_raw"
-output_path: "vins_result.csv"         # vins outputs will be wrttento vins_folder_path + output_path
+output_path: "dvio_result.log"         # vins outputs will be wrttento vins_folder_path + output_path
 
     #camera calibration 
 model_type: PINHOLE
@@ -23,6 +23,21 @@ projection_parameters:
     fy: 617.714
     cx: 326.245
     cy: 239.974
+
+#### feature tracking #### 
+sub_region_x: 12
+sub_region_y: 8 
+max_n_feature_subregion: 4 #4 #2
+boundary_x: 20
+boundary_y: 20
+min_dist_between_features: 10 #20
+harris_threshold: 0.00000001 #1e-8
+show_feature_tracking_result: 0 #1
+
+#### depth handler ####
+cloud_ds_rate: 4 # 2
+cloud_skip_rate: 1
+cloud_max_depth: 3.
 
         # Extrinsic parameter between IMU and Camera.
 estimate_extrinsic: 0 #1   # 0  Have an accurate extrinsic parameters. We will trust the following imu^R_cam, imu^T_cam, don't change it.
@@ -53,7 +68,7 @@ min_dist: 30  # 30          # min distance between two features
 freq: 10 # 10                # frequence (Hz) of publish tracking result. At least 10Hz for good estimation. If set 0, the frequence will be same as raw image 
 F_threshold: 2.0 # 2.0 # 3.0 # 2.0 1.0        # ransac threshold (pixel)
 show_track: 1           # publish tracking image as topic
-equalize: 1             # 1 if image is too dark or light, trun on equalize to find enough features
+equalize: 0             # 1 if image is too dark or light, trun on equalize to find enough features
 fisheye: 0              # if using fisheye, trun on it. A circle mask will be loaded to remove edge noisy points
 
         #optimization parameters
