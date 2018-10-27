@@ -1,0 +1,11 @@
+<launch>
+<node pkg="vis_navigation" type="ros_win_node" name="roswin_localization" output="screen">
+    <param name="map_file_name" type="string" value="$(find vis_navigation)/floorplan/roi3.png"/>
+    <!--param name="destination" type="string" value="elevator"/-->
+    <param name="start_x" type="double" value="100."/> <!-- 30 -->
+    <param name="start_y" type="double" value="390."/> <!--140-->
+    <param name="start_yaw" type="double" value="-90."/>
+    <param name="display_result" type="bool" value="true"/>
+</node> 
+
+</launch>

@@ -93,6 +93,9 @@ add_executable(depth_handler_pc vo/depth_handler.cpp vio/depth_handler_node_pc.c
 add_executable(rs_publisher rs_pub/pub_rs_data.cpp)
 add_executable(rs_publisher_rgbd rs_pub/pub_rs_data2.cpp)
 
+## read_traj file
+add_executable(read_traj src/read_traj_log.cpp)
+
 # target_link_libraries(featureTracking ${catkin_LIBRARIES} ${OpenCV_LIBS})
 # add_executable(visualOdometry src/visualOdometry.cpp)
 # target_link_libraries(visualOdometry ${catkin_LIBRARIES} ${OpenCV_LIBS})
