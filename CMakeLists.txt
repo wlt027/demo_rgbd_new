@@ -91,7 +91,7 @@ add_executable(depth_handler_pc vo/depth_handler.cpp vio/depth_handler_node_pc.c
 
 ## rs publisher
 add_executable(rs_publisher rs_pub/pub_rs_data.cpp)
-add_executable(rs_publisher_rgbd rs_pub/pub_rs_data2.cpp)
+# add_executable(rs_publisher_rgbd rs_pub/pub_rs_data2.cpp)
 
 ## read_traj file
 add_executable(read_traj src/read_traj_log.cpp)
